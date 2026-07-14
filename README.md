@@ -1,4 +1,4 @@
-# OpenFront Klon
+# Better Openfront
 
 Ein Browser-Strategiespiel im Stil von [openfront.io](https://openfront.io/) / territorial.io:
 Startpunkt wählen, Truppen wachsen lassen, Gebiete erobern und die Karte dominieren.
