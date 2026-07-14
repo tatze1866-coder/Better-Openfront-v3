@@ -1,4 +1,4 @@
-// OpenFront Klon – Lobby- und Relay-Server
+// Better Openfront – Lobby- und Relay-Server
 // Der Server simuliert NICHT das Spiel. Er verwaltet Lobbys und verteilt
 // die Spieler-Eingaben (Intents) im 100ms-Takt an alle Clients (Lockstep).
 const express = require('express');
