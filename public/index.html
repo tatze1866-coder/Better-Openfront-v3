@@ -9,101 +9,29 @@
 <body>
   <!-- Hauptmenü -->
   <div id="menu" class="screen active">
-    <div class="panel">
-      <h1>OpenFront <span>Klon</span></h1>
-      <label for="nameInput">Dein Name</label>
-      <input id="nameInput" type="text" maxlength="16" placeholder="Spieler" autocomplete="off">
+    <<div class="menu-card">
 
-      <div class="section">
-        <h2>Einzelspieler</h2>
-        <div class="row">
-          <label for="botCount">Bots: <b id="botCountLabel">4</b></label>
-          <input id="botCount" type="range" min="1" max="8" value="4">
-        </div>
-        <div class="seg" id="soloLevelSeg">
-          <button data-level="0">🟢 Leicht</button>
-          <button data-level="1" class="sel">🟡 Mittel</button>
-          <button data-level="2">🔴 Schwer</button>
-        </div>
-        <button id="btnSolo" class="primary">Gegen Bots spielen</button>
-      </div>
+    <h1 class="logo">BETTER OPENFRONT</h1>
 
-      <div class="section">
-        <h2>Mit Freunden spielen</h2>
-        <button id="btnCreate">Lobby erstellen</button>
-        <div class="row">
-          <input id="codeInput" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
-          <button id="btnJoin">Beitreten</button>
-        </div>
-      </div>
-      <div id="menuError" class="error hidden"></div>
-    </div>
-  </div>
+    <input id="nameInput" type="text" maxlength="16" placeholder="Spielername eingeben...">
 
-  <!-- Lobby -->
-  <div id="lobby" class="screen">
-    <div class="panel">
-      <h1>Lobby</h1>
-      <div class="lobby-code">Code: <b id="lobbyCode">----</b></div>
-      <p class="hint">Freunde öffnen diese Seite und treten mit dem Code bei.</p>
-      <ul id="lobbyPlayers"></ul>
-      <div class="row" id="lobbyBotsRow">
-        <label for="lobbyBots">Bots: <b id="lobbyBotsLabel">3</b></label>
-        <input id="lobbyBots" type="range" min="0" max="8" value="3">
-      </div>
-      <div class="seg" id="lobbyLevelSeg">
-        <button data-level="0">🟢 Leicht</button>
-        <button data-level="1" class="sel">🟡 Mittel</button>
-        <button data-level="2">🔴 Schwer</button>
-      </div>
-      <button id="btnStart" class="primary hidden">Spiel starten</button>
-      <p id="lobbyWait" class="hint">Warte auf den Host …</p>
-      <button id="btnLeaveLobby">Verlassen</button>
+    <div class="modeButtons">
+        <button id="btnSolo" class="green">👤 SOLO SPIEL</button>
+        <button id="btnCreate" class="blue">👥 MEHRSPIELER</button>
     </div>
-  </div>
 
-  <!-- Spiel -->
-  <div id="game" class="screen">
-    <canvas id="canvas"></canvas>
-    <div id="hudTop">
-      <div id="phaseInfo"></div>
-    </div>
-    <div id="leaderboard"></div>
-    <div id="hudBottom">
-      <div id="troopsInfo">Truppen: <b id="troopsLabel">0</b></div>
-      <div class="slider-wrap">
-        <input id="ratioSlider" type="range" min="5" max="100" step="5" value="30">
-        <span id="ratioLabel">30%</span>
-      </div>
-      <div class="build-row">
-        <button id="btnCity">🏙 Stadt</button>
-        <button id="btnFort">🛡 Festung</button>
-      </div>
-      <div class="hint">Klick = Angriff · andere Insel = Boot · Rangliste anklicken = Allianz</div>
-    </div>
-    <div id="toast" class="hidden"></div>
-    <canvas id="minimap" width="192" height="120"></canvas>
-    <div id="ctxMenu" class="hidden"></div>
-    <div id="shortcutHelp">
-      <div class="sh-title">⌨ Steuerung <span id="shToggle">ausblenden</span></div>
-      <ul id="shList">
-        <li><b>WASD</b> / Pfeile – Kamera bewegen</li>
-        <li><b>Mausrad</b> – Zoom · <b>Minimap</b> – springen</li>
-        <li><b>1</b> Stadt bauen · <b>2</b> Festung bauen</li>
-        <li><b>Linksklick</b> – angreifen / ausbreiten</li>
-        <li><b>Rechtsklick</b> – Menü (Allianz, Boot, Bauen)</li>
-        <li><b>Esc</b> – Modus / Menü abbrechen</li>
-      </ul>
-    </div>
-    <div id="overlay" class="hidden">
-      <div class="panel">
-        <h1 id="overlayTitle"></h1>
-        <p id="overlayText"></p>
-        <button id="btnBackToMenu" class="primary">Zurück zum Menü</button>
-      </div>
-    </div>
-  </div>
+    <button id="btnStartBig" class="playButton">
+        ⚔ SPIEL STARTEN
+    </button>
 
-  <script type="module" src="js/main.js"></script>
-</body>
-</html>
+    <div class="bottomButtons">
+        <button>⚙ Einstellungen</button>
+        <button>📖 Anleitung</button>
+        <button>⭐ Credits</button>
+    </div>
+
+</div>
+
+<div class="version">
+v0.0.1
+</div>
