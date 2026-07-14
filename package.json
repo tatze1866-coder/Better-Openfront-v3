@@ -1,5 +1,5 @@
 {
-  "name": "openfront-klon",
+  "name": "Better-Openfront",
   "version": "1.0.0",
   "description": "OpenFront-ähnliches Browser-Strategiespiel mit Bots und Lobby",
   "main": "server.js",
