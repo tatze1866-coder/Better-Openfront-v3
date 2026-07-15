@@ -6,7 +6,9 @@ import { Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
 
+// Die drei Vollbild-"Screens": Menue, Lobby, Spiel. Immer genau einer ist aktiv.
 const screens = { menu: $('menu'), lobby: $('lobby'), game: $('game') };
+// Genau einen Screen sichtbar schalten (per CSS-Klasse 'active').
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle('active', k === name);
 }
@@ -27,6 +29,7 @@ let buildMode = null; // null | 'city' | 'fort'
 let seenAllyRequests = new Set();
 let lastLobbyPlayers = [];
 
+// Vom Nutzer eingegebener Name (leer -> "Spieler", auf 16 Zeichen gekuerzt).
 function playerName() {
   return ($('nameInput').value.trim() || 'Spieler').slice(0, 16);
 }
@@ -162,6 +165,9 @@ function returnToLobbyScreen() {
   showScreen('lobby');
 }
 
+// Lobby-Anzeige an den vom Server gemeldeten Zustand anpassen: Code, Spieler-
+// liste, Host-Markierung und ob die Einstellungen bedienbar sind (nur der Host
+// darf Karte/Groesse/Bots aendern und das Spiel starten).
 function updateLobby(m) {
   lastLobbyPlayers = m.players;
   $('lobbyCode').textContent = m.code;
@@ -194,10 +200,13 @@ function updateLobby(m) {
 }
 
 // ---------- Netzwerk ----------
+// Objekt als JSON an den Server schicken (nur wenn die Verbindung offen ist).
 function wsSend(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
 }
 
+// WebSocket-Verbindung aufbauen und nach dem Verbinden onOpen ausfuehren
+// (z.B. Lobby erstellen/beitreten). Bestehende Verbindung wird vorher geschlossen.
 function connectAnd(onOpen) {
   if (ws) { ws.close(); ws = null; }
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -217,6 +226,8 @@ function connectAnd(onOpen) {
   };
 }
 
+// Eingehende Server-Nachrichten je nach Typ verarbeiten (Lobby beigetreten,
+// Lobby-Update, Fehler, Spielstart, Zug).
 function handleServerMsg(m) {
   switch (m.t) {
     case 'joined':
@@ -244,11 +255,15 @@ function handleServerMsg(m) {
   }
 }
 
+// Eigenen Spieler-Index (Position in der Spielerliste) anhand der Client-ID finden.
 function findMyIdx() {
   return lastLobbyPlayers.findIndex(p => p.cid === myCid);
 }
 
 // ---------- Spiel ----------
+// Ein neues Spiel aufsetzen: Zustand zuruecksetzen, Engine + Renderer erzeugen,
+// zum Spiel-Screen wechseln. Offline laeuft die Zug-Schleife lokal per Timer;
+// online liefert der Server die Zuege (siehe handleServerMsg 'turn').
 function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   myIdx = idx;
   online = isOnline;
@@ -280,10 +295,12 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   requestAnimationFrame(frame);
 }
 
+// Lokale Zug-Schleife stoppen (nur im Offline-/Solospiel aktiv).
 function stopLocalLoop() {
   if (localInterval) { clearInterval(localInterval); localInterval = null; }
 }
 
+// Alle vom Server empfangenen Zuege abarbeiten (holt evtl. Rueckstand auf).
 function processTurnQueue() {
   // Alle vorliegenden Turns sofort abarbeiten (holt Rückstand auf)
   while (turnQueue.length) {
@@ -292,6 +309,8 @@ function processTurnQueue() {
   }
 }
 
+// Einen Simulationsschritt ausfuehren: Intents anwenden, geaenderte Zellen dem
+// Renderer melden und pruefen, ob das Spiel vorbei ist.
 function stepTurn(intents) {
   if (!game || game.phase === 'ended') return;
   game.turn(intents);
@@ -302,6 +321,8 @@ function stepTurn(intents) {
   checkGameEnd();
 }
 
+// Eigene Eingabe abschicken: online an den Server, offline direkt in den lokalen
+// Puffer fuer den naechsten Zug.
 function sendIntent(d) {
   if (online) wsSend({ t: 'intent', d });
   else localPending.push({ p: myIdx, ...d });
@@ -355,6 +376,7 @@ $('overlay').addEventListener('click', e => {
 });
 
 // ---------- Toast ----------
+// Kurze Einblendung unten (Hinweis/Fehler), verschwindet nach 4 Sekunden.
 let toastTimer = null;
 function showToast(msg) {
   const el = $('toast');
@@ -373,10 +395,13 @@ const BUILD_KINDS = [
 ];
 const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik' };
 
+// Baumodus umschalten (nochmal derselbe -> aus). Danach reagiert ein Klick auf
+// die Karte mit "hier bauen" statt "angreifen".
 function setBuildMode(mode) {
   buildMode = buildMode === mode ? null : mode;
   updateBuildButtons();
 }
+// Bau-Buttons und Mauszeiger an den aktuellen Baumodus anpassen.
 function updateBuildButtons() {
   for (const bk of BUILD_KINDS) {
     $(bk.btn).classList.toggle('build-active', buildMode === bk.kind);
@@ -403,6 +428,7 @@ $('shToggle').addEventListener('click', () => {
   $('shToggle').textContent = help.classList.contains('collapsed') ? 'einblenden' : 'ausblenden';
 });
 
+// Sind wir gerade aktiv im Spiel-Screen? (Tastatur-/Maus-Steuerung nur dann)
 function inGame() {
   return game && screens.game.classList.contains('active');
 }
@@ -471,6 +497,8 @@ function fmt(n) {
   return String(n);
 }
 
+// HUD aktualisieren: Truppen, Geld, Phase-Hinweis, Allianz-Meldungen und die
+// Rangliste. Gedrosselt auf ~4x/Sekunde, damit es nicht jeden Frame neu baut.
 let lastHud = 0;
 function updateHud(now) {
   if (now - lastHud < 250 || !game) return;
@@ -530,6 +558,8 @@ function updateHud(now) {
 const keysDown = new Set();
 const PAN_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 let lastCam = 0;
+// Karte anhand gedrueckter Tasten verschieben. dt = Zeit seit letztem Frame,
+// damit die Geschwindigkeit unabhaengig von der Bildrate gleich bleibt.
 function updateCamera(now) {
   if (!renderer) return;
   const dt = lastCam ? Math.min(60, now - lastCam) : 16;
@@ -543,6 +573,8 @@ function updateCamera(now) {
   if (dx || dy) renderer.pan(dx, dy);
 }
 
+// Render-Schleife (einmal pro Bildschirm-Frame): Kamera, Karte, HUD. Stoppt von
+// selbst, sobald kein Spiel mehr laeuft (game/renderer null) – siehe startGame.
 function frame(now) {
   if (!game || !renderer) return;
   updateCamera(now);
@@ -588,6 +620,8 @@ function ownCellOnIsland(islandId) {
   return false;
 }
 
+// Linksklick auf die Karte auswerten (nur wenn nicht gepannt wurde): je nach
+// Phase/Modus Startpunkt setzen, bauen, angreifen oder ein Boot losschicken.
 canvas.addEventListener('pointerup', e => {
   if (!pointerDown) return;
   pointerDown = false;
@@ -755,6 +789,9 @@ function buildCtxItems(owner, cell) {
   return items;
 }
 
+// Kontextmenue an der Mausposition aufbauen und anzeigen. Kopfzeile nennt das
+// Ziel (eigenes/fremdes/neutrales Gebiet), darunter die passenden Aktionen.
+// Die Position wird so begrenzt, dass das Menue im Fenster bleibt.
 function openCtxMenu(clientX, clientY, owner, cell) {
   const items = buildCtxItems(owner, cell);
   if (items.length === 0) { hideCtxMenu(); return; }

@@ -1,8 +1,15 @@
 // Stilisierte Weltkarten-Daten: Kontinente als Polygone (Lon/Lat),
 // Inseln als Ellipsen, Binnenmeere als Ausschnitte.
-// Die Formen sind bewusst grob – beim Rastern sorgt Küsten-Rauschen
+// Die Formen sind bewusst grob – beim Rastern (mapgen.js) sorgt Küsten-Rauschen
 // für organische, pro Seed leicht unterschiedliche Küstenlinien.
+//
+// Koordinaten sind geografisch: Lon = Längengrad (-180..180, Ost positiv),
+// Lat = Breitengrad (-90..90, Nord positiv). mapgen.js rechnet diese je nach
+// gewaehltem Kartenausschnitt (MAP_VIEWS) auf Pixel-Zellen um.
 
+// Landflaechen. Zwei moegliche Formen:
+//   poly:    Liste von [Lon, Lat]-Eckpunkten (Polygonzug des Kontinents)
+//   ellipse: [Zentrum-Lon, Zentrum-Lat, Radius-Lon, Radius-Lat, Rotation°]
 export const LAND_SHAPES = [
   { name: 'Nordamerika', poly: [[-168, 66], [-160, 70], [-150, 71], [-140, 70], [-128, 71], [-118, 73], [-105, 73], [-92, 72], [-84, 70], [-76, 73], [-68, 70], [-60, 62], [-55, 53], [-60, 47], [-67, 45], [-70, 43], [-74, 40], [-76, 37], [-80, 32], [-81, 26], [-84, 30], [-90, 30], [-94, 29], [-97, 26], [-97, 22], [-94, 18], [-88, 16], [-83, 10], [-80, 9], [-84, 12], [-91, 16], [-97, 17], [-104, 20], [-110, 24], [-115, 30], [-121, 35], [-124, 40], [-124, 46], [-128, 50], [-133, 55], [-140, 60], [-148, 61], [-153, 59], [-160, 56], [-166, 55], [-168, 60]] },
   { name: 'Grönland', poly: [[-58, 76], [-50, 80], [-40, 83], [-28, 83], [-20, 79], [-22, 73], [-30, 68], [-40, 60], [-46, 60], [-52, 64], [-56, 70]] },
@@ -46,7 +53,10 @@ export const SEA_SHAPES = [
   { name: 'Persischer Golf', ellipse: [51, 27, 3.4, 1.6, -25] },
 ];
 
-// Kartenausschnitte (Lon/Lat-Bounding-Box) für die wählbaren Karten
+// Kartenausschnitte (Lon/Lat-Bounding-Box) für die wählbaren Karten.
+// Jeder Eintrag legt fest, welcher Weltausschnitt auf die Spielkarte gerastert
+// wird – z.B. 'europe' zeigt nur den Bereich um Europa. 'random' (in engine.js)
+// nutzt keine dieser Ansichten, sondern erzeugt zufaellige Inseln.
 export const MAP_VIEWS = {
   world: { lon: [-180, 180], lat: [-56, 80] },
   europe: { lon: [-25, 45], lat: [34, 72] },

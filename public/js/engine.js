@@ -156,6 +156,8 @@ export class Game {
   }
 
   // ---------- Hilfen ----------
+  // Die bis zu 4 orthogonalen Nachbarzellen von c in out schreiben (Randzellen
+  // haben weniger). Rueckgabe = Anzahl. Wiederverwendetes out-Array spart Speicher.
   neighbors4(c, out) {
     const w = this.map.w, h = this.map.h;
     const x = c % w, y = (c / w) | 0;
@@ -167,19 +169,28 @@ export class Game {
     return k;
   }
 
+  // Quadrat des Abstands zwischen zwei Zellen (ohne Wurzel = schneller; reicht
+  // fuer Radius-Vergleiche, deshalb ueberall die "…2"-Konstanten/-Namen).
   dist2(a, b) {
     const w = this.map.w;
     const dx = (a % w) - (b % w), dy = ((a / w) | 0) - ((b / w) | 0);
     return dx * dx + dy * dy;
   }
 
+  // Allianzen werden als "kleinerIdx:groessererIdx" gespeichert, damit ein Paar
+  // immer denselben Schluessel hat, egal in welcher Reihenfolge gefragt wird.
   allianceKey(a, b) { return a < b ? `${a}:${b}` : `${b}:${a}`; }
   isAllied(a, b) { return this.alliances.has(this.allianceKey(a, b)); }
 
+  // Truppen-Obergrenze eines Spielers: waechst mit Gebiet und Staedten.
   maxTroopsOf(p) {
     return p.territory * MAX_PER_TERRITORY + MAX_BASE + p.cities * CITY_MAX_BONUS;
   }
 
+  // Zelle einem neuen Besitzer geben und dabei alle Zaehler mitfuehren:
+  // Gebiets-Zaehler beider Spieler, ein evtl. auf der Zelle stehendes Gebaeude
+  // (wechselt den Besitzer bzw. verschwindet bei Neutralisierung) und die
+  // dirty-Liste fuer den Renderer.
   setOwner(cell, p) {
     const prev = this.owner[cell];
     if (prev === p) return;
@@ -221,11 +232,15 @@ export class Game {
     }
   }
 
+  // Alle Zellen eines Spielers wieder neutral machen (z.B. bei erneuter
+  // Startpunkt-Wahl in der Spawn-Phase).
   clearPlayerCells(pIdx) {
     const n = this.map.w * this.map.h;
     for (let i = 0; i < n; i++) if (this.owner[i] === pIdx) this.setOwner(i, -1);
   }
 
+  // Jeden Spieler auf ein Start-Feld setzen (kleiner Anfangs-Blob). Es wird
+  // versucht, die Startpunkte moeglichst weit auseinander zu legen (fairer Start).
   placeInitialSpawns() {
     // Nur auf ausreichend großen Inseln starten
     const candidates = this.landCells.filter(c => this.map.islandSizes[this.map.island[c]] >= 400);
@@ -249,10 +264,14 @@ export class Game {
   }
 
   // ---------- Intents ----------
+  // Eine einzelne Spieler-Eingabe anwenden (it.p = Spieler-Index, it.type = Art).
+  // Jeder Fall prueft zuerst Gueltigkeit/Phase und veraendert dann den Zustand.
+  // Weil das deterministisch auf allen Clients laeuft, bleiben alle synchron.
   applyIntent(it) {
     const p = this.players[it.p];
     if (!p || !p.alive) return;
     switch (it.type) {
+      // Startpunkt in der Spawn-Phase setzen (altes Startgebiet wird geraeumt)
       case 'spawn': {
         if (this.phase !== 'spawn') return;
         const c = it.cell | 0;
@@ -270,10 +289,12 @@ export class Game {
           if (!this.players[target] || !this.players[target].alive) return;
           if (this.isAllied(p.idx, target)) return;
         }
+        // ratio = Anteil der eigenen Truppen, die in den Angriff gehen
         const ratio = Math.max(0.01, Math.min(1, it.ratio || 0.3));
         const troops = Math.floor(p.troops * ratio);
         if (troops < 1) return;
         p.troops -= troops;
+        // Laeuft schon ein Angriff auf dieses Ziel? Dann nur Nachschub geben.
         const existing = this.attacks.find(a => a.attacker === p.idx && a.target === target);
         if (existing) {
           existing.pool += troops; // Nachschub für die laufende Front
@@ -282,6 +303,7 @@ export class Game {
         }
         break;
       }
+      // Transportboot zu einer (fremden/neutralen) Kuestenzelle schicken
       case 'boat': {
         if (this.phase !== 'play') return;
         const c = it.cell | 0;
@@ -299,6 +321,7 @@ export class Game {
         this.boats.push({ owner: p.idx, troops, path: res.path, landing: res.landing, pos: 0 });
         break;
       }
+      // Gebaeude auf eigenem Gebiet errichten (Geld wird abgezogen)
       case 'build': {
         if (this.phase !== 'play') return;
         const kind = BUILD_COSTS[it.kind] ? it.kind : 'city';
@@ -311,6 +334,7 @@ export class Game {
         p[KIND_FIELD[kind]]++;
         break;
       }
+      // Kriegsschiff an einem eigenen Hafen bauen (max. 2 je Hafen)
       case 'warship': {
         if (this.phase !== 'play') return;
         const c = it.cell | 0;
@@ -328,6 +352,7 @@ export class Game {
         this.warships.push({ owner: p.idx, home: c, cell: spawn, path: [], pi: 0, dmg: 0, born: this.turnNo, cd: WARSHIP_SHOT_CD });
         break;
       }
+      // Allianz anfragen bzw. eine offene Gegenanfrage annehmen
       case 'ally': {
         const t = it.target | 0;
         if (t === p.idx || !this.players[t] || !this.players[t].alive) return;
@@ -349,6 +374,7 @@ export class Game {
         }
         break;
       }
+      // Allianz aufkuendigen (und offene Anfragen in beide Richtungen loeschen)
       case 'unally': {
         const t = it.target | 0;
         if (!this.players[t]) return;
@@ -395,6 +421,8 @@ export class Game {
     return null;
   }
 
+  // Die Grenzzellen eines Angriffs bestimmen: alle Zellen des Ziels, die direkt
+  // an Land des Angreifers grenzen. Diese "Front" faellt beim naechsten Vorstoss.
   scanFrontier(attacker, target) {
     const frontier = new Set();
     const n = this.map.w * this.map.h;
@@ -469,6 +497,9 @@ export class Game {
     return { path, landing };
   }
 
+  // Boote pro Tick vorwaerts bewegen; am Ziel wird die Landung abgerechnet:
+  // gegen Kosten (Verteidiger-Dichte + Festung) erobert die Landung die Zelle,
+  // ueberschuessige Truppen kaempfen als normaler Angriff weiter (Brueckenkopf).
   processBoats() {
     for (const boat of this.boats) {
       const p = this.players[boat.owner];
@@ -501,6 +532,8 @@ export class Game {
   }
 
   // ---------- Wasser-Wegsuche (generisch) ----------
+  // Kuerzesten Weg ueber Wasser von einer der Startzellen (sources) zur ersten
+  // Zelle finden, die goalFn erfuellt. Rueckgabe = Zellenpfad oder null.
   bfsWater(sources, goalFn) {
     const { terrain } = this.map;
     const n = this.owner.length;
@@ -528,6 +561,7 @@ export class Game {
     return null;
   }
 
+  // Alle direkt angrenzenden Wasserzellen einer Zelle (z.B. Wasser neben Hafen).
   waterAdjacent(cell) {
     const nb = new Int32Array(4);
     const k = this.neighbors4(cell, nb);
@@ -536,6 +570,8 @@ export class Game {
     return out;
   }
 
+  // Wasserweg zwischen zwei Haefen: von Wasser neben dem einen zum Wasser neben
+  // dem anderen Hafen (fuer Handelsschiffe).
   portWaterPath(fromCell, toCell) {
     const sources = this.waterAdjacent(fromCell);
     if (!sources.length) return null;
@@ -545,10 +581,13 @@ export class Game {
   }
 
   // ---------- Handel (Häfen & Handelsschiffe) ----------
+  // Aktuelle Zelle eines Schiffs auf seinem Pfad (pos ist eine Fliesskommazahl).
   tradeShipCell(s) {
     return s.path[Math.min(s.path.length - 1, s.pos | 0)];
   }
 
+  // Handel pro Tick: Haefen entsenden Handelsschiffe zu fremden Haefen; bei
+  // Ankunft verdienen beide Seiten Geld (Wert steigt mit der Weglaenge).
   processTrade() {
     // Häfen schicken Handelsschiffe zu fremden Häfen
     for (const b of this.buildings) {
@@ -586,10 +625,15 @@ export class Game {
   }
 
   // ---------- Kriegsschiffe ----------
+  // Maximale Lebenspunkte eines Kriegsschiffs: Basis + Bonus, der mit dem Alter
+  // (Ticks seit born) bis zu einem Maximum ansteigt.
   warshipMaxHp(w) {
     return WARSHIP_BASE_HP + Math.min(WARSHIP_BONUS_HP, ((this.turnNo - w.born) / WARSHIP_HP_GROW) | 0);
   }
 
+  // Neues Ziel/Route fuer ein Kriegsschiff festlegen. Prioritaet: schwer
+  // beschaedigt -> Reparaturhafen; sonst nahes feindliches Handelsschiff jagen;
+  // sonst um den Heimathafen patrouillieren.
   retargetWarship(w, maxHp) {
     let goal = null; // Zielzelle (Wasser) oder Prädikat
     if (w.dmg >= maxHp - 1) {
@@ -637,6 +681,8 @@ export class Game {
     }
   }
 
+  // Kriegsschiffe pro Tick: ggf. reparieren, Kurs setzen, bewegen, feindliche
+  // Handelsschiffe kapern und in Reichweite auf Boote/Kriegsschiffe schiessen.
   processWarships() {
     for (const w of this.warships) {
       if (!this.players[w.owner].alive) { w.dead = true; continue; }
@@ -690,11 +736,14 @@ export class Game {
   }
 
   // ---------- Fabriken & Züge ----------
+  // Alle Stationen (Staedte/Haefen) im Schienen-Radius einer Fabrik – die Ziele,
+  // die ihre Zuege anfahren koennen.
   factoryStations(factory) {
     return this.buildings.filter(b =>
       (b.kind === 'city' || b.kind === 'port') && this.dist2(b.cell, factory.cell) <= FACTORY_RADIUS2);
   }
 
+  // Interpolierte Zugposition zwischen Fabrik und Station (fuer den Renderer).
   trainPos(tr) {
     // Position auf der Schiene (für Renderer): Fabrik <-> Station
     const w = this.map.w;
@@ -704,6 +753,9 @@ export class Game {
     return [fx + (sx - fx) * t, fy + (sy - fy) * t];
   }
 
+  // Zuege pro Tick: Fabriken erzeugen mit Wahrscheinlichkeit neue Zuege, die
+  // zwischen Fabrik und Station pendeln und bei jedem Stationsbesuch Geld bringen
+  // (verbuendete Stationen zahlen am meisten). Nach TRAIN_VISITS endet der Zug.
   processTrains() {
     // Chance auf neue Züge je Fabrik
     for (const b of this.buildings) {
@@ -755,6 +807,9 @@ export class Game {
   }
 
   // ---------- Tick ----------
+  // Ein kompletter Spielschritt: erst alle Eingaben anwenden, dann – in der
+  // Spielphase – Bots, Wirtschaft und alle Einheiten verarbeiten und regelmaessig
+  // die Siegbedingung pruefen. In der Spawn-Phase wird nur hochgezaehlt.
   turn(intents) {
     if (this.phase === 'ended') return;
     for (const it of intents) this.applyIntent(it);
@@ -786,6 +841,8 @@ export class Game {
     return (3 + p.territory * 0.028 + p.cities * 4) * curve;
   }
 
+  // Wirtschaft pro Tick: jeder lebende Spieler bekommt Truppennachwuchs (bis zum
+  // Limit) und Geld (Basis + Betrag pro Gebietszelle).
   economy() {
     for (const p of this.players) {
       if (!p.alive || p.territory === 0) continue;
@@ -795,6 +852,10 @@ export class Game {
     }
   }
 
+  // Angriffe pro Tick abarbeiten. Jeder Angriff hat einen Truppen-"Pool", der die
+  // Front (scanFrontier) im festen Takt vorruecken laesst; jede eroberte Zelle
+  // kostet – Verteidiger-Dichte und Festungen machen es teurer. Faellt das
+  // letzte Gebiet des Verteidigers, wird er eliminiert. Reste kehren zurueck.
   processAttacks() {
     for (const atk of this.attacks) {
       const attacker = this.players[atk.attacker];
@@ -862,6 +923,8 @@ export class Game {
     this.attacks = this.attacks.filter(a => a.pool > 0);
   }
 
+  // Einen Spieler ausscheiden lassen: als tot markieren und seine laufenden
+  // Angriffe, Boote und offenen Allianz-Anfragen aufraeumen.
   eliminate(p) {
     p.alive = false;
     p.troops = 0;
@@ -901,6 +964,9 @@ export class Game {
     return groups;
   }
 
+  // Siegbedingung pruefen: Sieg, wenn nur noch ein Spieler/Buendnis lebt ODER
+  // ein Buendnis gemeinsam >= WIN_FRACTION (70%) des Landes kontrolliert. Setzt
+  // dann winners (Team-Sieg moeglich) und beendet das Spiel (phase = 'ended').
   checkWin() {
     const alive = this.players.filter(p => p.alive);
     if (alive.length === 0) return;
@@ -924,6 +990,9 @@ export class Game {
   }
 
   // ---------- Bot-KI ----------
+  // Jeden Bot in seinem eigenen Takt (L.interval) handeln lassen. Der Versatz
+  // (p.idx * 5) verteilt die Bots ueber die Ticks, damit nicht alle gleichzeitig
+  // rechnen (spart Rechenzeit und wirkt natuerlicher).
   botThink() {
     for (const p of this.players) {
       if (!p.isBot || !p.alive) continue;
@@ -933,6 +1002,8 @@ export class Game {
     }
   }
 
+  // Eine zufaellige eigene Zelle finden (bis zu 'tries' Versuche), z.B. als
+  // Bauplatz. -1, wenn in den Versuchen keine getroffen wurde.
   randomOwnCell(pIdx, tries) {
     for (let t = 0; t < tries; t++) {
       const c = this.landCells[(this.rng() * this.landCells.length) | 0];
@@ -992,6 +1063,10 @@ export class Game {
     }
   }
 
+  // Ein Bot-Zug (Strategie, je nach Schwierigkeit L). Reihenfolge: Allianzen
+  // beantworten, bauen, dann angreifen – bevorzugt neutrales Land, sonst den
+  // schwaechsten Nachbarn; ohne Landziel per Boot auf andere Inseln expandieren.
+  // Greift nur an, wenn genug Truppen frei sind (nicht alles schon gebunden).
   botAct(p, L) {
     // Allianz-Anfragen beantworten (Zustimmung je nach Schwierigkeit)
     for (let x = 0; x < this.players.length; x++) {
