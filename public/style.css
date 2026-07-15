@@ -240,15 +240,10 @@ position:relative;
 }
 
 .background{
-
 position:absolute;
-
 inset:0;
-
 background:
-
 radial-gradient(circle at top,#223866 0%,#0d1117 70%);
-
 animation:bgMove 10s ease-in-out infinite alternate;
 
 }
@@ -256,13 +251,10 @@ animation:bgMove 10s ease-in-out infinite alternate;
 @keyframes bgMove{
 
 from{
-
 transform:scale(1);
 
 }
-
 to{
-
 transform:scale(1.08);
 
 }
@@ -270,135 +262,81 @@ transform:scale(1.08);
 }
 
 .menu-panel{
-
 position:relative;
-
 width:470px;
-
 padding:40px;
-
 border-radius:22px;
-
 background:rgba(18,25,40,.82);
-
 backdrop-filter:blur(16px);
-
 box-shadow:0 0 60px rgba(0,0,0,.45);
-
 display:flex;
-
 flex-direction:column;
-
 gap:25px;
-
 z-index:10;
-
 }
 
 .title{
-
 text-align:center;
-
 }
 
 .title h1{
-
 font-size:42px;
-
 margin:0;
-
 color:white;
-
 }
 
 .title p{
-
 margin-top:8px;
-
 color:#8ca5d8;
-
 }
 
 .player-box{
-
 display:flex;
-
 flex-direction:column;
-
 gap:8px;
-
 }
 
 .player-box input{
-
 padding:14px;
-
 border:none;
-
 border-radius:10px;
-
 background:#1b2438;
-
 color:white;
-
 }
 
 .play-btn{
-
 height:65px;
-
 font-size:26px;
-
 font-weight:bold;
-
 border:none;
-
 border-radius:14px;
-
 cursor:pointer;
-
 background:#4f7dff;
-
 color:white;
-
 transition:.25s;
-
 }
 
 .play-btn:hover{
-
 transform:scale(1.04);
-
 background:#6b95ff;
-
 box-shadow:0 0 20px #4f7dff;
-
 }
 
 .settings,.multiplayer{
-
 display:flex;
-
 flex-direction:column;
-
 gap:12px;
-
 }
 
 .settings h2,
 
 .multiplayer h2{
-
 margin:0;
-
 color:white;
 
 }
-
 .join{
-
 display:flex;
-
 gap:10px;
 
 }
@@ -409,20 +347,14 @@ gap:10px;
     font-size:22px;
     text-align:center;
     letter-spacing:3px;
-
     border:none;
     border-radius:8px;
-
     background:#1b2438;
     color:white;
 }
 
 .footer{
-
 text-align:center;
-
 opacity:.6;
-
 font-size:14px;
-
 }
