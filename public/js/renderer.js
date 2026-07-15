@@ -52,7 +52,8 @@ export class Renderer {
 
     this.resize();
     // Start: Karte einpassen (scale = Zoom, ox/oy = Verschiebung/Pan)
-    const s = Math.min(canvas.width / w, canvas.height / h) * 0.95;
+    // x3: die Karte startet dreimal so groß / reingezoomt wie vorher.
+    const s = Math.min(canvas.width / w, canvas.height / h) * 0.95 * 3;
     this.scale = s;
     this.ox = (canvas.width - w * s) / 2;
     this.oy = (canvas.height - h * s) / 2;
