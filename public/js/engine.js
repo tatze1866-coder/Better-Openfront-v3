@@ -90,7 +90,9 @@ const TRAIN_PAY = { own: 6, enemy: 12, ally: 18 }; // aufsteigend: eigene < frem
 
 // Boote
 export const MAX_BOATS = 3;
-const BOAT_SPEED = 2;                // Wasserzellen pro Tick
+// Bewusst verlangsamt (früher 2): Boote fahren gemächlicher, damit man
+// Invasionen kommen sieht und mit Kriegsschiffen abfangen kann.
+const BOAT_SPEED = 1.2;              // Wasserzellen pro Tick
 const BOAT_MIN_TROOPS = 20;
 
 export const PLAYER_COLORS = [

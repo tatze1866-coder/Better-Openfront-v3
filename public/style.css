@@ -245,6 +245,11 @@ button.primary:hover { background: #f4845f; }
   display: flex; align-items: center; justify-content: center;
 }
 #overlay .panel { text-align: center; }
+/* Button-Leiste im Endscreen/Tod-Overlay: gestapelt, volle Breite.
+   Einzelne Buttons werden per .hidden ein-/ausgeblendet (main.js). */
+.overlay-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.overlay-buttons button { width: 100%; }
+.overlay-buttons button.hidden { display: none; }
 
 
 /* =========================================================================

@@ -158,7 +158,14 @@
       <div class="panel">
         <h1 id="overlayTitle"></h1>
         <p id="overlayText"></p>
-        <button id="btnBackToMenu" class="primary">Zurück zum Menü</button>
+        <!-- Buttons werden je nach Situation (Tod / Warten / Spielende) per JS
+             ein- und ausgeblendet, siehe checkGameEnd() in main.js -->
+        <div class="overlay-buttons">
+          <button id="btnSpectate">Zuschauen</button>
+          <button id="btnWaitLobby">In Lobby warten</button>
+          <button id="btnBackToLobby" class="primary">Zurück zur Lobby</button>
+          <button id="btnBackToMenu" class="primary">Zurück zum Menü</button>
+        </div>
       </div>
     </div>
   </div>

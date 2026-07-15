@@ -131,9 +131,36 @@ $('btnBackToMenu').addEventListener('click', () => {
   if (ws) { ws.close(); ws = null; }
   game = null;
   renderer = null;
-  $('overlay').classList.add('hidden');
+  hideOverlay();
   showScreen('menu');
 });
+
+// "Zurück zur Lobby" (Online, nach Spielende): Server setzt den Room zurück und
+// broadcastet 'lobby' -> dadurch kommen ALLE gemeinsam zurück (kein lokaler
+// Sofortwechsel, damit alle Clients einheitlich umschalten).
+$('btnBackToLobby').addEventListener('click', () => wsSend({ t: 'returnLobby' }));
+
+// "Zuschauen" bzw. "Doch zuschauen": Overlay schließen, Spiel weiter beobachten.
+$('btnSpectate').addEventListener('click', hideOverlay);
+
+// "In Lobby warten": Warte-Bildschirm. Das Spiel simuliert im Hintergrund weiter
+// (Turns laufen über processTurnQueue); bei Spielende ersetzt checkGameEnd das
+// Overlay durch das Ergebnis, oder der Lobby-Broadcast holt uns automatisch zurück.
+$('btnWaitLobby').addEventListener('click', () => {
+  showOverlay('In der Lobby warten …',
+    'Du wartest auf das Spielende. Danach geht es zurück in die Lobby.',
+    ['btnSpectate']);
+});
+
+// Zurück in die Lobby wechseln und das laufende Spiel abbauen (Frame-Schleife
+// stoppt von selbst, sobald game === null ist – siehe frame()).
+function returnToLobbyScreen() {
+  stopLocalLoop();
+  game = null;
+  renderer = null;
+  hideOverlay();
+  showScreen('lobby');
+}
 
 function updateLobby(m) {
   lastLobbyPlayers = m.players;
@@ -197,6 +224,11 @@ function handleServerMsg(m) {
       showScreen('lobby');
       break;
     case 'lobby':
+      // Kommt ein Lobby-Update, während bei uns noch ein Spiel läuft/beendet ist
+      // (game !== null), hat der Server den Room nach Spielende zurückgesetzt
+      // (returnLobby) -> wir gehen zurück in die gemeinsame Lobby. Vor dem Spiel
+      // ist game === null, dann ist es ein ganz normales Lobby-Update.
+      if (game) returnToLobbyScreen();
       updateLobby(m);
       break;
     case 'error':
@@ -278,34 +310,48 @@ function sendIntent(d) {
 function checkGameEnd() {
   const me = game.players[myIdx];
   if (game.winners) {
+    // Spielende (ein Spieler/eine Allianz hat ≥70% Land oder ist als Einzige übrig)
     const iWon = game.winners.includes(myIdx);
     const names = game.winners.map(i => game.players[i].name).join(', ');
+    let title, text;
     if (iWon && game.winners.length > 1) {
       const partners = game.winners.filter(i => i !== myIdx).map(i => game.players[i].name).join(', ');
-      showOverlay('Team-Sieg! 🏆🤝', `Gemeinsam gewonnen mit: ${partners}`);
+      title = 'Team-Sieg! 🏆🤝'; text = `Gemeinsam gewonnen mit: ${partners}`;
     } else if (iWon) {
-      showOverlay('Sieg! 🏆', 'Du beherrschst die Karte!');
+      title = 'Sieg! 🏆'; text = 'Du beherrschst die Karte!';
     } else {
-      showOverlay('Spiel vorbei', game.winners.length > 1 ? `Das Bündnis ${names} hat gewonnen.` : `${names} hat gewonnen.`);
+      title = 'Spiel vorbei';
+      text = game.winners.length > 1 ? `Das Bündnis ${names} hat gewonnen.` : `${names} hat gewonnen.`;
     }
+    // Online: gemeinsam zurück in die Lobby (oder ganz raus ins Menü). Solo: nur Menü.
+    showOverlay(title, text, online ? ['btnBackToLobby', 'btnBackToMenu'] : ['btnBackToMenu']);
     stopLocalLoop();
   } else if (me && !me.alive && !deadShown) {
+    // Eigener Tod, während das Spiel weiterläuft: Wahl zwischen Zuschauen und
+    // (Online) in der Lobby auf das Spielende warten. Nur einmal zeigen.
     deadShown = true;
-    showOverlay('Eliminiert 💀', 'Dein Reich wurde erobert. Du kannst zuschauen.');
+    showOverlay('Eliminiert 💀', 'Dein Reich wurde erobert.',
+      online ? ['btnSpectate', 'btnWaitLobby'] : ['btnSpectate', 'btnBackToMenu']);
   }
 }
 
-function showOverlay(title, text) {
+// Alle Overlay-Buttons, die situationsabhängig ein-/ausgeblendet werden
+const OVERLAY_BUTTONS = ['btnSpectate', 'btnWaitLobby', 'btnBackToLobby', 'btnBackToMenu'];
+
+// Overlay mit Titel/Text zeigen und genau die übergebenen Buttons einblenden
+function showOverlay(title, text, buttons = []) {
   $('overlayTitle').textContent = title;
   $('overlayText').textContent = text;
+  for (const id of OVERLAY_BUTTONS) $(id).classList.toggle('hidden', !buttons.includes(id));
   $('overlay').classList.remove('hidden');
 }
 
-// Bei "Eliminiert" darf man das Overlay wegklicken und zuschauen
+function hideOverlay() { $('overlay').classList.add('hidden'); }
+
+// Bei "Eliminiert" darf man das Overlay auch per Klick auf den Hintergrund
+// wegklicken und einfach zuschauen (solange das Spiel noch läuft)
 $('overlay').addEventListener('click', e => {
-  if (e.target === $('overlay') && game && !game.winners) {
-    $('overlay').classList.add('hidden');
-  }
+  if (e.target === $('overlay') && game && !game.winners) hideOverlay();
 });
 
 // ---------- Toast ----------

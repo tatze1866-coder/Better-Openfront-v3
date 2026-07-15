@@ -155,6 +155,21 @@ function handleMessage(ws, m) {
       room.pending.push(intent);
       break;
     }
+    // Nach Spielende: Room in den Lobby-Zustand zurücksetzen, damit alle
+    // (Sieger wie Verlierer) gemeinsam in derselben Lobby landen und eine
+    // neue Runde starten können. Darf jeder auslösen; der !started-Guard
+    // macht doppelte Klicks (zwei Spieler klicken gleichzeitig) harmlos.
+    case 'returnLobby': {
+      const room = ws.room;
+      if (!room || !room.started) return;
+      if (room.interval) { clearInterval(room.interval); room.interval = null; }
+      room.started = false;
+      room.turn = 0;
+      room.pending = [];
+      for (const c of room.clients) c.idx = -1; // Spielplätze für neue Runde freigeben
+      broadcast(room, lobbyState(room));        // started:false -> Clients zeigen wieder die Lobby
+      break;
+    }
     case 'leave': {
       handleClose(ws);
       break;
