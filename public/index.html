@@ -4,47 +4,83 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OpenFront Klon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <!-- Hauptmenü -->
   <div id="menu" class="screen active">
-    <div class="panel">
-      <h1>OpenFront <span>Klon</span></h1>
-      <label for="nameInput">Dein Name</label>
-      <input id="nameInput" type="text" maxlength="16" placeholder="Spieler" autocomplete="off">
+    <div class="menu-frame">
+      <svg class="corner corner-tl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
+      <svg class="corner corner-tr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
+      <svg class="corner corner-bl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
+      <svg class="corner corner-br" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
 
-      <div class="section">
-        <h2>Einzelspieler</h2>
-        <div class="row">
-          <label for="soloMap">Karte</label>
-          <select id="soloMap"></select>
-        </div>
-        <div class="row">
-          <label for="soloSize">Größe</label>
-          <select id="soloSize"></select>
-        </div>
-        <div class="row">
-          <label for="botCount">Bots: <b id="botCountLabel">4</b></label>
-          <input id="botCount" type="range" min="1" max="15" value="4">
-        </div>
-        <div class="seg" id="soloLevelSeg">
-          <button data-level="0">🟢 Leicht</button>
-          <button data-level="1" class="sel">🟡 Mittel</button>
-          <button data-level="2">🔴 Schwer</button>
-        </div>
-        <button id="btnSolo" class="primary">Gegen Bots spielen</button>
+      <div class="menu-titleplate">
+        <h1>OpenFront <span>Klon</span></h1>
       </div>
 
-      <div class="section">
-        <h2>Mit Freunden spielen</h2>
-        <button id="btnCreate">Lobby erstellen</button>
-        <div class="row">
-          <input id="codeInput" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
-          <button id="btnJoin">Beitreten</button>
-        </div>
+      <div class="menu-body">
+        <section class="panel panel-solo">
+          <h2>Einzelspieler</h2>
+          <label for="nameInput">Dein Name</label>
+          <input id="nameInput" type="text" maxlength="16" placeholder="Spieler" autocomplete="off">
+
+          <div class="row">
+            <label for="soloMap">Karte</label>
+            <select id="soloMap"></select>
+          </div>
+          <div class="row">
+            <label for="soloSize">Größe</label>
+            <select id="soloSize"></select>
+          </div>
+          <div class="row">
+            <label for="botCount">Bots: <b id="botCountLabel">4</b></label>
+            <input id="botCount" type="range" min="1" max="15" value="4">
+          </div>
+          <div class="seg" id="soloLevelSeg">
+            <button data-level="0">🟢 Leicht</button>
+            <button data-level="1" class="sel">🟡 Mittel</button>
+            <button data-level="2">🔴 Schwer</button>
+          </div>
+          <button id="btnSolo" class="primary">Gegen Bots spielen</button>
+        </section>
+
+        <section class="panel panel-multi">
+          <h2>Mit Freunden spielen</h2>
+          <button id="btnCreate">Lobby erstellen</button>
+          <p class="hint">— oder —</p>
+          <div class="row">
+            <input id="codeInput" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
+            <button id="btnJoin">Beitreten</button>
+          </div>
+        </section>
       </div>
+
       <div id="menuError" class="error hidden"></div>
+      <div class="menu-footer">Version 3.0</div>
     </div>
   </div>
 
