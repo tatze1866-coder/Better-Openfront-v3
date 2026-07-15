@@ -431,7 +431,7 @@ button.primary:hover { background: #f4845f; }
     background-position: center;
     background-repeat: no-repeat;
 
-    z-index: 0;
+    z-index: -1;
 }
 
 #menu{
