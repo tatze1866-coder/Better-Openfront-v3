@@ -320,17 +320,128 @@ button.primary:hover { background: #f4845f; }
 }
 .menu-titleplate h1 span { color: #7a3a1f; }
 
-.menu-body {
+.menu-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 26px;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 22px;
   align-items: start;
 }
-@media (max-width: 760px) {
-  .menu-body { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .menu-columns { grid-template-columns: 1fr; }
 }
 
-#menu .panel-solo, #menu .panel-multi {
+/* ---- Mittlere Spalte: PLAY-Emblem, Button, Tagline und News ---- */
+.menu-center { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.play-wrap { width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+.play-emblem { position: relative; width: 150px; height: 54px; margin-bottom: 2px; }
+.play-emblem .laurel { width: 150px; height: auto; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+.play-emblem .crown {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  font-size: 28px; line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(212, 175, 106, 0.75));
+}
+
+/* Großer glänzender PLAY-Knopf (löst das Solo-Spiel aus, id=btnSolo) */
+#menu .play-btn {
+  width: 100%;
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-size: clamp(26px, 3.2vw, 40px);
+  color: #f3ead0;
+  padding: 22px 18px;
+  margin-top: 4px;
+  border: 2px solid #d4af6a;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #4a89cc 0%, #2b619a 52%, #16375a 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -12px 22px rgba(0, 0, 0, 0.28),
+    0 8px 22px rgba(0, 0, 0, 0.5),
+    0 0 26px rgba(80, 140, 210, 0.35);
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+#menu .play-btn:hover {
+  background: linear-gradient(180deg, #5797dc 0%, #316ba6 52%, #1a4067 100%);
+  border-color: #f0d68a;
+}
+
+.play-tagline {
+  margin-top: 14px;
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase; letter-spacing: 2px;
+  font-size: 13px; color: #c9b98a;
+}
+.play-tagline i { font-style: normal; color: #5b9bd8; font-size: 9px; }
+
+.panel-news { width: 100%; }
+.news-list { list-style: none; }
+.news-list li {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 2px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px; color: #d9cba6;
+  border-bottom: 1px solid rgba(138, 109, 47, 0.18);
+}
+.news-list li:last-child { border-bottom: none; }
+.news-list li span { flex: 1; }
+.news-list i { font-style: normal; color: #d4af6a; font-size: 10px; }
+.badge-new {
+  font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 1px;
+  color: #f0d68a; padding: 1px 6px; border-radius: 3px;
+  border: 1px solid #8a6d2f; background: rgba(138, 109, 47, 0.2);
+}
+
+/* ---- Rechte Spalte: Mehrspieler ---- */
+#menu .create-lobby {
+  background: linear-gradient(180deg, #2f6198, #173a5c);
+  border: 1px solid #d4af6a;
+  color: #f0e6c8;
+  font-size: 15px; padding: 13px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 5px 14px rgba(0, 0, 0, 0.4);
+}
+#menu .create-lobby:hover { background: linear-gradient(180deg, #3a75b5, #1d4a73); border-color: #f0d68a; }
+.join-title {
+  text-align: center; margin: 20px 0 10px;
+  font-family: 'Cinzel', serif; text-transform: uppercase;
+  letter-spacing: 2px; font-size: 13px; color: #d4af6a;
+}
+.join-row { justify-content: center; }
+
+/* ---- Bots-Slider mit Wert und Endpunkten ---- */
+.slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+.slider-head b { font-family: 'Cinzel', serif; color: #f0d68a; font-size: 18px; }
+#menu #botCount { width: 100%; margin: 8px 0 2px; }
+.slider-ends {
+  display: flex; justify-content: space-between;
+  font-family: 'Cormorant Garamond', serif; font-size: 12px; color: #8a7a4f;
+  margin-bottom: 4px;
+}
+#menu .block-label { display: block; margin: 14px 0 8px; }
+
+/* ---- Platzhalter-Icons unten (noch ohne Funktion) ---- */
+.menu-icons { display: flex; justify-content: center; gap: 18px; margin-top: 22px; }
+#menu .icon-btn {
+  width: 44px; height: 44px; padding: 0; margin: 0;
+  border-radius: 50%; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  color: #d4af6a;
+  background: radial-gradient(circle at 50% 35%, #24405f, #13253a);
+  border: 1px solid #6b5423;
+  box-shadow: 0 0 0 1px rgba(212, 175, 106, 0.3), 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+#menu .icon-btn:hover { border-color: #d4af6a; background: radial-gradient(circle at 50% 35%, #2c4d70, #1a3552); }
+#menu .icon-btn svg { width: 20px; height: 20px; }
+
+/* Gold-SVG-Icons in Krone und Create-Lobby-Button */
+.play-emblem .crown svg { width: 30px; height: auto; display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+#menu .create-lobby { display: flex; align-items: center; justify-content: center; gap: 9px; }
+#menu .create-lobby svg { width: 19px; height: 19px; flex: none; }
+
+#menu .panel {
   width: auto;
   background: linear-gradient(180deg, rgba(9, 17, 26, 0.92), rgba(15, 27, 40, 0.85));
   border: 1px solid #6b5423;
