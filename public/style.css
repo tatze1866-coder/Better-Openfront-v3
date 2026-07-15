@@ -1,12 +1,4 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
 
-body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: #16283c;
-  color: #e8eef4;
-  overflow: hidden;
-  height: 100vh;
-}
 
 .screen { display: none; width: 100vw; height: 100vh; }
 .screen.active { display: flex; align-items: center; justify-content: center; }
