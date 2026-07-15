@@ -554,3 +554,129 @@ button.primary:hover { background: #f4845f; }
     position: relative;
     z-index: 1;
 }
+
+/* =========================================================================
+   LOBBY – Karten-/Wappen-Look, analog zum Hauptmenü
+   ========================================================================= */
+
+#lobby.screen {
+  padding: 24px;
+  background:
+    radial-gradient(ellipse 480px 340px at 14% 22%, rgba(150, 140, 80, 0.32), transparent 60%),
+    radial-gradient(ellipse 560px 380px at 88% 16%, rgba(170, 160, 95, 0.28), transparent 55%),
+    radial-gradient(ellipse 680px 440px at 78% 82%, rgba(110, 105, 60, 0.3), transparent 60%),
+    radial-gradient(ellipse 900px 600px at 50% 50%, rgba(22, 40, 60, 0) 0%, rgba(8, 15, 22, 0.55) 100%),
+    linear-gradient(160deg, rgba(28, 51, 72, 0.42) 0%, rgba(16, 29, 42, 0.60) 100%);
+}
+
+.lobby-frame {
+  width: min(460px, 96vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 32px 20px;
+}
+
+.lobby-titleplate {
+  margin: 10px auto 26px;
+  padding: 14px 40px;
+}
+.lobby-titleplate h1 {
+  font-size: clamp(22px, 3.6vw, 30px);
+  color: #211a10;
+}
+
+.lobby-panel {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(9, 17, 26, 0.92), rgba(15, 27, 40, 0.85));
+  border: 1px solid #6b5423;
+  border-radius: 4px;
+  padding: 22px 24px 26px;
+  box-shadow: 0 0 0 1px rgba(212, 175, 106, 0.45), 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.lobby-code {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 1px;
+  font-size: 18px;
+  color: #d9cba6;
+  margin-bottom: 4px;
+}
+.lobby-code b {
+  color: #f0d68a;
+  letter-spacing: 6px;
+  font-size: 24px;
+}
+
+.lobby-panel .hint {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  color: #8a7a4f;
+}
+
+#lobbyPlayers {
+  list-style: none;
+  margin: 14px 0;
+}
+#lobbyPlayers li {
+  padding: 8px 12px;
+  background: rgba(6, 12, 18, 0.75);
+  border: 1px solid #6b5423;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  color: #eae1c8;
+  display: flex;
+  justify-content: space-between;
+}
+#lobbyPlayers li .tag { color: #f0d68a; font-size: 12px; }
+
+.lobby-panel label {
+  font-family: 'Cormorant Garamond', serif;
+  color: #c9b98a;
+  font-size: 16px;
+}
+
+.lobby-panel select {
+  background: rgba(6, 12, 18, 0.75);
+  border: 1px solid #6b5423;
+  color: #eae1c8;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  border-radius: 4px;
+}
+.lobby-panel select:focus { border-color: #d4af6a; }
+
+.lobby-panel input[type="range"] { accent-color: #d4af6a; }
+
+.lobby-panel .block-label { display: block; margin: 14px 0 8px; }
+
+.lobby-panel button {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 1px;
+  font-size: 14px;
+  background: linear-gradient(180deg, #24405f, #16283c);
+  border: 1px solid #6b5423;
+  color: #e8dcb8;
+  border-radius: 5px;
+}
+.lobby-panel button:hover { background: linear-gradient(180deg, #2c4d70, #1c3450); border-color: #d4af6a; }
+
+.lobby-panel button.primary {
+  background: linear-gradient(180deg, #2f6198, #173a5c);
+  border: 1px solid #d4af6a;
+  color: #f0e6c8;
+  font-size: 16px;
+  padding: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+.lobby-panel button.primary:hover { background: linear-gradient(180deg, #3a75b5, #1d4a73); }
+
+.lobby-panel #lobbyLevelSeg button[data-level="0"] { background: linear-gradient(180deg, #33532f, #203a1e); border-color: #4c7a4f; }
+.lobby-panel #lobbyLevelSeg button[data-level="1"] { background: linear-gradient(180deg, #6b551f, #4a3a15); border-color: #8a6d2f; }
+.lobby-panel #lobbyLevelSeg button[data-level="2"] { background: linear-gradient(180deg, #5c2226, #3a1517); border-color: #8a3236; }
+.lobby-panel #lobbyLevelSeg button.sel {
+  box-shadow: 0 0 0 2px #f0d68a inset, 0 0 10px rgba(240, 214, 138, 0.5);
+}
