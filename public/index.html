@@ -8,30 +8,155 @@
 </head>
 <body>
   <!-- Hauptmenü -->
-  <div id="menu" class="screen active">
-    <<div class="menu-card">
+ <!-- ========================= -->
+<!--        STARTMENÜ         -->
+<!-- ========================= -->
 
-    <h1 class="logo">BETTER OPENFRONT</h1>
+<div id="menu" class="screen active">
 
-    <input id="nameInput" type="text" maxlength="16" placeholder="Spielername eingeben...">
+    <div class="menu-overlay"></div>
 
-    <div class="modeButtons">
-        <button id="btnSolo" class="green">👤 SOLO SPIEL</button>
-        <button id="btnCreate" class="blue">👥 MEHRSPIELER</button>
+    <div class="menu-container">
+
+        <div class="logo-area">
+
+            <h1 class="game-logo">
+                BETTER
+                <span>OPENFRONT</span>
+            </h1>
+
+            <div class="game-subtitle">
+                Conquer • Expand • Dominate
+            </div>
+
+        </div>
+
+        <div class="menu-card">
+
+            <label class="menu-label">
+                SPIELERNAME
+            </label>
+
+            <input
+                id="nameInput"
+                type="text"
+                maxlength="16"
+                placeholder="Spielername eingeben..."
+                autocomplete="off">
+
+            <div class="menu-divider"></div>
+
+            <h2 class="menu-title">
+                Einzelspieler
+            </h2>
+
+            <div class="slider-row">
+
+                <span>
+                    Bots
+                </span>
+
+                <b id="botCountLabel">
+                    4
+                </b>
+
+            </div>
+
+            <input
+                id="botCount"
+                type="range"
+                min="1"
+                max="8"
+                value="4">
+
+            <div
+                class="seg"
+                id="soloLevelSeg">
+
+                <button data-level="0">
+                    🟢 Leicht
+                </button>
+
+                <button
+                    data-level="1"
+                    class="sel">
+                    🟡 Mittel
+                </button>
+
+                <button data-level="2">
+                    🔴 Schwer
+                </button>
+
+            </div>
+
+            <button
+                id="btnSolo"
+                class="playButton">
+
+                ⚔ SOLO SPIELEN
+
+            </button>
+
+            <div class="menu-divider"></div>
+
+            <h2 class="menu-title">
+                Mehrspieler
+            </h2>
+
+            <button
+                id="btnCreate"
+                class="blueButton">
+
+                👥 Lobby erstellen
+
+            </button>
+
+            <div class="joinRow">
+
+                <input
+                    id="codeInput"
+                    type="text"
+                    maxlength="4"
+                    placeholder="CODE"
+                    autocomplete="off">
+
+                <button id="btnJoin">
+
+                    Beitreten
+
+                </button>
+
+            </div>
+
+            <div
+                id="menuError"
+                class="error hidden">
+            </div>
+
+        </div>
+
+        <div class="menu-footer">
+
+            <button class="footerBtn">
+                ⚙ Einstellungen
+            </button>
+
+            <button class="footerBtn">
+                📖 Anleitung
+            </button>
+
+            <button class="footerBtn">
+                ⭐ Credits
+            </button>
+
+        </div>
+
+        <div class="version">
+
+            v0.0.1
+
+        </div>
+
     </div>
 
-    <button id="btnStartBig" class="playButton">
-        ⚔ SPIEL STARTEN
-    </button>
-
-    <div class="bottomButtons">
-        <button>⚙ Einstellungen</button>
-        <button>📖 Anleitung</button>
-        <button>⭐ Credits</button>
-    </div>
-
-</div>
-
-<div class="version">
-v0.0.1
 </div>
