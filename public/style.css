@@ -1,18 +1,14 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-
-.screen { display: none; width: 100vw; height: 100vh; }
-.screen.active { display: flex; align-items: center; justify-content: center; }
-#game.active { display: block; }
-
-.panel {
-  background: #1f3550;
-  border: 1px solid #35547a;
-  border-radius: 12px;
-  padding: 28px 32px;
-  width: 340px;
-  max-width: 92vw;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #16283c;
+  color: #e8eef4;
+  overflow: hidden;
+  height: 100vh;
 }
+
+
 
 h1 { font-size: 28px; margin-bottom: 18px; text-align: center; }
 h1 span { color: #f4a261; }
