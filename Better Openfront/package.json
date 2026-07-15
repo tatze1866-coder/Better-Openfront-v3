@@ -1,0 +1,17 @@
+{
+  "name": "openfront-klon",
+  "version": "0.7.1",
+  "description": "OpenFront-ähnliches Browser-Strategiespiel mit Bots und Lobby",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/engine.test.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
