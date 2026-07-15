@@ -12,7 +12,7 @@
 <body>
   <!-- Hauptmenü -->
   <div class="menu-background"></div>
-  
+
   <div id="menu" class="screen active">
     <div class="menu-frame">
       <svg class="corner corner-tl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -144,72 +144,115 @@
     </div>
   </div>
 
- <!-- Lobby -->
-<div id="lobby" class="screen">
-  <div class="menu-frame lobby-frame">
-    <svg class="corner corner-tl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
-      <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-      <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
-      <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-    </svg>
-    <svg class="corner corner-tr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
-      <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-      <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
-      <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-    </svg>
-    <svg class="corner corner-bl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
-      <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-      <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
-      <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-    </svg>
-    <svg class="corner corner-br" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
-      <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-      <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
-      <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
-    </svg>
+  <!-- Lobby -->
+  <div id="lobby" class="screen">
+    <div class="menu-frame lobby-frame">
+      <svg class="corner corner-tl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
+      <svg class="corner corner-tr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
+      <svg class="corner corner-bl" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
+      <svg class="corner corner-br" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 70 L4 20 Q4 4 20 4 L70 4" fill="none" stroke="#d4af6a" stroke-width="3"/>
+        <path d="M4 44 Q16 44 16 32 Q16 20 28 20" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+        <circle cx="16" cy="16" r="4.5" fill="#d4af6a"/>
+        <path d="M32 4 Q32 16 44 16" fill="none" stroke="#d4af6a" stroke-width="1.6"/>
+      </svg>
 
-    <div class="menu-titleplate lobby-titleplate">
-      <h1>Lobby</h1>
+      <div class="menu-titleplate lobby-titleplate">
+        <h1>Lobby</h1>
+      </div>
+
+      <div class="panel lobby-panel">
+        <div class="lobby-code">Code: <b id="lobbyCode">----</b></div>
+        <p class="hint">Freunde öffnen diese Seite und treten mit dem Code bei.</p>
+
+        <ul id="lobbyPlayers"></ul>
+
+        <div class="row">
+          <label for="lobbyMap">Karte</label>
+          <select id="lobbyMap"></select>
+        </div>
+        <div class="row">
+          <label for="lobbySize">Größe</label>
+          <select id="lobbySize"></select>
+        </div>
+        <div class="row" id="lobbyBotsRow">
+          <label for="lobbyBots">Bots: <b id="lobbyBotsLabel">3</b></label>
+          <input id="lobbyBots" type="range" min="0" max="15" value="3">
+        </div>
+
+        <label class="block-label">Schwierigkeit</label>
+        <div class="seg" id="lobbyLevelSeg">
+          <button data-level="0">🟢 Leicht</button>
+          <button data-level="1" class="sel">🟡 Mittel</button>
+          <button data-level="2">🔴 Schwer</button>
+        </div>
+
+        <button id="btnStart" class="primary hidden">Spiel starten</button>
+        <p id="lobbyWait" class="hint">Warte auf den Host …</p>
+        <button id="btnLeaveLobby">Verlassen</button>
+      </div>
+
+      <div class="menu-footer">Version 3.0</div>
     </div>
-
-    <div class="panel lobby-panel">
-      <div class="lobby-code">Code: <b id="lobbyCode">----</b></div>
-      <p class="hint">Freunde öffnen diese Seite und treten mit dem Code bei.</p>
-
-      <ul id="lobbyPlayers"></ul>
-
-      <div class="row">
-        <label for="lobbyMap">Karte</label>
-        <select id="lobbyMap"></select>
-      </div>
-      <div class="row">
-        <label for="lobbySize">Größe</label>
-        <select id="lobbySize"></select>
-      </div>
-      <div class="row" id="lobbyBotsRow">
-        <label for="lobbyBots">Bots: <b id="lobbyBotsLabel">3</b></label>
-        <input id="lobbyBots" type="range" min="0" max="15" value="3">
-      </div>
-
-      <label class="block-label">Schwierigkeit</label>
-      <div class="seg" id="lobbyLevelSeg">
-        <button data-level="0">🟢 Leicht</button>
-        <button data-level="1" class="sel">🟡 Mittel</button>
-        <button data-level="2">🔴 Schwer</button>
-      </div>
-
-      <button id="btnStart" class="primary hidden">Spiel starten</button>
-      <p id="lobbyWait" class="hint">Warte auf den Host …</p>
-      <button id="btnLeaveLobby">Verlassen</button>
-    </div>
-
-    <div class="menu-footer">Version 3.0</div>
   </div>
-</div>
+
+  <!-- Spiel -->
+  <div id="game" class="screen">
+    <canvas id="canvas"></canvas>
+    <div id="hudTop">
+      <div id="phaseInfo"></div>
+    </div>
+    <div id="leaderboard"></div>
+    <div id="hudBottom">
+      <div id="statsRow">
+        <div id="troopsInfo">Truppen: <b id="troopsLabel">0</b><span id="growthLabel"></span></div>
+        <div id="moneyInfo">💰 <b id="moneyLabel">0</b> €</div>
+      </div>
+      <div class="slider-wrap">
+        <input id="ratioSlider" type="range" min="5" max="100" step="5" value="30">
+        <span id="ratioLabel">30%</span>
+      </div>
+      <div class="build-row">
+        <button id="btnCity">🏙 Stadt</button>
+        <button id="btnFort">🛡 Festung</button>
+        <button id="btnPort">⚓ Hafen</button>
+        <button id="btnFactory">🏭 Fabrik</button>
+      </div>
+      <div class="hint">Klick = Angriff · andere Insel = Boot · Rechtsklick = Menü (Bauen, Kriegsschiff, Allianz)</div>
+    </div>
+    <div id="toast" class="hidden"></div>
+    <canvas id="minimap" width="192" height="120"></canvas>
+    <div id="ctxMenu" class="hidden"></div>
+    <div id="shortcutHelp">
+      <div class="sh-title">⌨ Steuerung <span id="shToggle">ausblenden</span></div>
+      <ul id="shList">
+        <li><b>WASD</b> / Pfeile – Kamera bewegen</li>
+        <li><b>Mausrad</b> – Zoom · <b>Minimap</b> – springen</li>
+        <li><b>1</b> Stadt · <b>2</b> Festung · <b>3</b> Hafen · <b>4</b> Fabrik</li>
+        <li><b>Linksklick</b> – angreifen / ausbreiten</li>
+        <li><b>Rechtsklick</b> – Menü (Allianz, Boot, Bauen)</li>
+        <li><b>Esc</b> – Modus / Menü abbrechen</li>
+      </ul>
+    </div>
+    <div id="overlay" class="hidden">
+      <div class="panel">
+        <h1 id="overlayTitle"></h1>
+        <p id="overlayText"></p>
         <!-- Buttons werden je nach Situation (Tod / Warten / Spielende) per JS
              ein- und ausgeblendet, siehe checkGameEnd() in main.js -->
         <div class="overlay-buttons">
