@@ -410,19 +410,17 @@ gap:10px;
 }
 
 .join input{
+    width:120px;
+    padding:12px;
+    font-size:22px;
+    text-align:center;
+    letter-spacing:3px;
 
-flex:1;
+    border:none;
+    border-radius:8px;
 
-padding:12px;
-
-border:none;
-
-border-radius:8px;
-
-background:#1b2438;
-
-color:white;
-
+    background:#1b2438;
+    color:white;
 }
 
 .footer{
