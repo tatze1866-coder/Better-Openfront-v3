@@ -230,10 +230,8 @@ button.primary:hover { background: #f4845f; }
 #overlay .panel { text-align: center; }
 
 #menu{
-display:flex;
 justify-content:center;
 align-items:center;
-height:100vh;
 background:#0d1117;
 overflow:hidden;
 position:relative;
