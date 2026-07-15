@@ -229,11 +229,9 @@ button.primary:hover { background: #f4845f; }
 }
 #overlay .panel { text-align: center; }
 
-#menu{
-
-display:flex;
-justify-content:center;
-align-items:center;
+#menu.active {
+    display:flex;
+}
 
 height:100vh;
 
