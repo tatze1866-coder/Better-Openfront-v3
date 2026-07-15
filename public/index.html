@@ -8,45 +8,99 @@
 </head>
 <body>
   <!-- Hauptmenü -->
-  <div id="menu" class="screen active">
-    <div class="panel">
-      <h1>OpenFront <span>Klon</span></h1>
-      <label for="nameInput">Dein Name</label>
-      <input id="nameInput" type="text" maxlength="16" placeholder="Spieler" autocomplete="off">
+<div id="menu" class="screen active">
 
-      <div class="section">
-        <h2>Einzelspieler</h2>
-        <div class="row">
-          <label for="soloMap">Karte</label>
-          <select id="soloMap"></select>
-        </div>
-        <div class="row">
-          <label for="soloSize">Größe</label>
-          <select id="soloSize"></select>
-        </div>
-        <div class="row">
-          <label for="botCount">Bots: <b id="botCountLabel">4</b></label>
-          <input id="botCount" type="range" min="1" max="15" value="4">
-        </div>
-        <div class="seg" id="soloLevelSeg">
-          <button data-level="0">🟢 Leicht</button>
-          <button data-level="1" class="sel">🟡 Mittel</button>
-          <button data-level="2">🔴 Schwer</button>
-        </div>
-        <button id="btnSolo" class="primary">Gegen Bots spielen</button>
-      </div>
+    <div class="menu-bg"></div>
 
-      <div class="section">
-        <h2>Mit Freunden spielen</h2>
-        <button id="btnCreate">Lobby erstellen</button>
-        <div class="row">
-          <input id="codeInput" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
-          <button id="btnJoin">Beitreten</button>
+    <div class="menu-card">
+
+        <div class="logo">
+            <h1>Better OpenFront</h1>
+            <p>Conquer • Expand • Survive</p>
         </div>
-      </div>
-      <div id="menuError" class="error hidden"></div>
+
+        <div class="menu-section">
+
+            <label>Username</label>
+
+            <input
+                id="nameInput"
+                maxlength="16"
+                placeholder="Player">
+
+        </div>
+
+        <button id="btnSolo" class="play-button">
+            ▶ PLAY
+        </button>
+
+        <div class="menu-section">
+
+            <h2>Singleplayer</h2>
+
+            <div class="row">
+
+                <span>Bots</span>
+
+                <b id="botCountLabel">4</b>
+
+            </div>
+
+            <input
+                id="botCount"
+                type="range"
+                min="1"
+                max="8"
+                value="4">
+
+            <div id="soloLevelSeg" class="difficulty">
+
+                <button data-level="0">Easy</button>
+
+                <button data-level="1" class="sel">Medium</button>
+
+                <button data-level="2">Hard</button>
+
+            </div>
+
+        </div>
+
+        <div class="menu-section">
+
+            <h2>Multiplayer</h2>
+
+            <button id="btnCreate">
+                Create Lobby
+            </button>
+
+            <div class="join-row">
+
+                <input
+                    id="codeInput"
+                    maxlength="6"
+                    placeholder="ABC123">
+
+                <button id="btnJoin">
+
+                    Join
+
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="version">
+
+            Better OpenFront v3
+
+        </div>
+
+        <div id="menuError" class="error hidden"></div>
+
     </div>
-  </div>
+
+</div>
 
   <!-- Lobby -->
   <div id="lobby" class="screen">
