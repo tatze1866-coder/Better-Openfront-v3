@@ -65,6 +65,7 @@ const CITY_MAX_BONUS = 25000;        // Stadt: +max. Truppen (wichtigstes Gebäu
 const FORT_RADIUS2 = 900;            // Festung schützt im Radius 30
 const FORT_DEFENSE = 5;              // Eroberung dort 5x so teuer (stapelt nicht)
 const MIN_BUILD_DIST2 = 100;         // Mindestabstand 10 zwischen eigenen Gebäuden
+const PORT_SNAP_RADIUS = 8;          // Hafen-Klick springt bis zu 8 Zellen zur Küste
 
 // Häfen & Handel
 const TRADE_INTERVAL = 100;          // Hafen versucht alle 10s ein Handelsschiff
@@ -143,6 +144,9 @@ export class Game {
     // Schienennetz-Graph, jede Runde neu berechnet (siehe buildRailNetwork):
     // adj = Zelle -> Nachbarknoten, edges = Kantenliste fürs Zeichnen
     this.rails = { adj: new Map(), edges: [] };
+    // Einnahmen aus Handel/Zügen in diesem Tick: { p, amount } – nur fürs HUD
+    // (Geld-Popups), wird jede Runde geleert und beeinflusst die Simulation nicht.
+    this.moneyEvents = [];
     this.buildings = [];           // Städte, Festungen, Häfen, Fabriken
     this.buildingAt = new Map();   // Zelle -> Gebäude
     this.alliances = new Set();    // "a:b" (a < b)
@@ -341,7 +345,7 @@ export class Game {
       case 'build': {
         if (this.phase !== 'play') return;
         const kind = BUILD_COSTS[it.kind] ? it.kind : 'city';
-        const c = it.cell | 0;
+        const c = this.resolveBuildCell(p.idx, it.cell | 0, kind);
         if (this.canBuildAt(p.idx, c, kind) !== null) return;
         p.money -= this.buildCostOf(p.idx, kind);
         const b = { owner: p.idx, kind, cell: c };
@@ -425,17 +429,45 @@ export class Game {
     if (cell < 0 || cell >= this.owner.length || this.owner[cell] !== pIdx) return 'Nur auf eigenem Gebiet baubar.';
     const cost = this.buildCostOf(pIdx, kind);
     if (p.money < cost) return `Nicht genug Geld (${cost} € nötig).`;
-    if (kind === 'port') {
-      const nb = new Int32Array(4);
-      const k = this.neighbors4(cell, nb);
-      let coastal = false;
-      for (let i = 0; i < k; i++) if (this.map.terrain[nb[i]] === 0) coastal = true;
-      if (!coastal) return 'Ein Hafen braucht Küste (Zelle am Wasser).';
+    if (kind === 'port' && !this.isCoastal(cell)) {
+      return 'Ein Hafen braucht Küste (Zelle am Wasser).';
     }
     for (const b of this.buildings) {
       if (b.owner === pIdx && this.dist2(b.cell, cell) < MIN_BUILD_DIST2) return 'Zu nah an einem eigenen Gebäude.';
     }
     return null;
+  }
+
+  // Grenzt die Zelle direkt an Wasser?
+  isCoastal(cell) {
+    const nb = new Int32Array(4);
+    const k = this.neighbors4(cell, nb);
+    for (let i = 0; i < k; i++) if (this.map.terrain[nb[i]] === 0) return true;
+    return false;
+  }
+
+  // Klick-Zelle für den Bau auflösen. Häfen werden großzügig behandelt: liegt
+  // die Zelle nicht direkt an der Küste, wird im Umkreis (PORT_SNAP_RADIUS) die
+  // nächste eigene, bebaubare Küstenzelle gewählt – man muss also nur in die
+  // Nähe des Wassers klicken. Andere Gebäude bauen exakt auf der Klick-Zelle.
+  resolveBuildCell(pIdx, cell, kind) {
+    if (kind !== 'port' || cell < 0 || cell >= this.owner.length) return cell;
+    if (this.isCoastal(cell)) return cell;
+    const w = this.map.w, h = this.map.h;
+    const cx = cell % w, cy = (cell / w) | 0;
+    const R = PORT_SNAP_RADIUS;
+    let best = cell, bestD = Infinity;
+    for (let y = Math.max(0, cy - R); y <= Math.min(h - 1, cy + R); y++) {
+      for (let x = Math.max(0, cx - R); x <= Math.min(w - 1, cx + R); x++) {
+        const c = y * w + x;
+        if (this.owner[c] !== pIdx || !this.isCoastal(c)) continue;
+        const d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+        if (d >= bestD || d > R * R) continue;
+        if (this.canBuildAt(pIdx, c, 'port') !== null) continue;
+        bestD = d; best = c;
+      }
+    }
+    return best;
   }
 
   // Die Grenzzellen eines Angriffs bestimmen: alle Zellen des Ziels, die direkt
@@ -634,7 +666,11 @@ export class Game {
         if (port && port.kind === 'port') {
           const value = TRADE_VALUE_BASE + TRADE_VALUE_COEF * Math.pow(s.path.length, TRADE_VALUE_EXP);
           this.players[s.owner].money += value;
-          if (this.players[port.owner].alive) this.players[port.owner].money += value;
+          this.moneyEvents.push({ p: s.owner, amount: value });
+          if (this.players[port.owner].alive) {
+            this.players[port.owner].money += value;
+            this.moneyEvents.push({ p: port.owner, amount: value });
+          }
         }
       }
     }
@@ -786,8 +822,15 @@ export class Game {
     };
     for (const f of this.buildings) {
       if (f.kind !== 'factory') continue;
-      // Knoten dieses Netzes: die Fabrik selbst und jede Station in ihrem Radius
+      // Knoten dieses Netzes: die Fabrik selbst, jede Station in ihrem Radius
+      // und andere Fabriken in Reichweite. Fabriken zahlen nichts, wenn ein Zug
+      // durchfaehrt (payTrain gilt nur fuer Staedte/Haefen) – sie verbinden nur.
       const nodes = [f.cell, ...this.factoryStations(f).map(s => s.cell)];
+      for (const o of this.buildings) {
+        if (o.kind === 'factory' && o !== f && this.dist2(o.cell, f.cell) <= FACTORY_RADIUS2) {
+          nodes.push(o.cell);
+        }
+      }
       // Minimaler Spannbaum (Prim, ausgehend von der Fabrik): jede Station haengt
       // sich an den naechstgelegenen bereits verbundenen Knoten. Dadurch entsteht
       // eine Kette entlang der Gebaeude statt eines Sterns zur Fabrik -- eine
@@ -832,11 +875,19 @@ export class Game {
   // Fremde Station: BEIDE Seiten verdienen (verbuendet bringt am meisten).
   payTrain(tr, st) {
     const me = this.players[tr.owner];
-    if (st.owner === tr.owner) { me.money += TRAIN_PAY.own; return; }
+    if (st.owner === tr.owner) {
+      me.money += TRAIN_PAY.own;
+      this.moneyEvents.push({ p: tr.owner, amount: TRAIN_PAY.own });
+      return;
+    }
     const pay = this.isAllied(st.owner, tr.owner) ? TRAIN_PAY.ally : TRAIN_PAY.foreign;
     me.money += pay;
+    this.moneyEvents.push({ p: tr.owner, amount: pay });
     const other = this.players[st.owner];
-    if (other && other.alive) other.money += pay;
+    if (other && other.alive) {
+      other.money += pay;
+      this.moneyEvents.push({ p: st.owner, amount: pay });
+    }
   }
 
   // Zuege pro Tick: Fabriken erzeugen mit Wahrscheinlichkeit neue Zuege, die das
@@ -903,6 +954,7 @@ export class Game {
       return;
     }
 
+    this.moneyEvents.length = 0;
     this.botThink();
     this.economy();
     this.processBoats();

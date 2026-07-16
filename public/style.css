@@ -219,8 +219,34 @@ button.primary:hover { background: #f4845f; }
 #troopsInfo { font-size: 16px; }
 #troopsInfo b { color: #e8eef4; }
 #growthLabel { color: #f4a261; font-weight: 700; font-size: 14px; }
-#moneyInfo { font-size: 16px; }
+#moneyInfo { font-size: 16px; position: relative; }
 #moneyInfo b { color: #ffd60a; }
+/* Einnahme-Popups: stapeln sich über der Geldanzeige, das Neuste unten */
+#moneyPops {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 16px); /* knapp über dem HUD-Panel */
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.money-pop {
+  color: #ffd60a;
+  font-weight: 700;
+  font-size: 15px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  animation: moneyPop 3s ease-out forwards;
+}
+@keyframes moneyPop {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.85); }
+  10%  { opacity: 1; transform: translateY(0) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
 .slider-wrap { display: flex; align-items: center; gap: 10px; width: 100%; }
 .slider-wrap input { flex: 1; }
 #ratioLabel { width: 44px; text-align: right; font-weight: 600; color: #f4a261; }

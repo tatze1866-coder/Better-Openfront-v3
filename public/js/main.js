@@ -389,6 +389,7 @@ function processTurnQueue() {
 function stepTurn(intents) {
   if (!game || game.phase === 'ended') return;
   game.turn(intents);
+  showMoneyPops();
   if (renderer && game.dirty.length) {
     renderer.markDirty(game.dirty);
     game.dirty.length = 0;
@@ -567,6 +568,25 @@ $('leaderboard').addEventListener('click', e => {
 });
 
 // ---------- HUD ----------
+// Einnahmen aus Handel & Zügen poppen über der Geldanzeige auf: das Neuste
+// steht direkt über dem Geld, Ältere rutschen nach oben (max. 5 gleichzeitig),
+// jedes bleibt 3 Sekunden sichtbar und faded dann aus.
+const MONEY_POP_MS = 3000;
+const MONEY_POP_MAX = 5;
+function showMoneyPops() {
+  if (!game || myIdx < 0 || game.phase !== 'play') return;
+  let sum = 0;
+  for (const e of game.moneyEvents) if (e.p === myIdx) sum += e.amount;
+  if (sum <= 0) return;
+  const box = $('moneyPops');
+  const el = document.createElement('div');
+  el.className = 'money-pop';
+  el.textContent = `+${fmt(sum)} €`;
+  box.appendChild(el); // Neustes unten – Ältere werden nach oben gedrückt
+  while (box.children.length > MONEY_POP_MAX) box.firstChild.remove();
+  setTimeout(() => el.remove(), MONEY_POP_MS);
+}
+
 function fmt(n) {
   n = Math.floor(n);
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -863,11 +883,14 @@ canvas.addEventListener('pointerup', e => {
   if (!me || !me.alive) return;
 
   if (buildMode) {
-    const err = game.canBuildAt(myIdx, cell, buildMode);
+    // Häfen: Klick in Küstennähe genügt – die Engine snappt zur nächsten
+    // Küstenzelle. Hier dieselbe Auflösung, damit die Fehlermeldung passt.
+    const bCell = game.resolveBuildCell(myIdx, cell, buildMode);
+    const err = game.canBuildAt(myIdx, bCell, buildMode);
     if (err) {
       showToast(err);
     } else {
-      sendIntent({ type: 'build', kind: buildMode, cell });
+      sendIntent({ type: 'build', kind: buildMode, cell: bCell });
       setBuildMode(buildMode); // Modus beenden
     }
     return;
@@ -1002,11 +1025,12 @@ function buildCtxItems(owner, cell) {
       });
     }
     for (const bk of BUILD_KINDS) {
-      const err = game.canBuildAt(myIdx, cell, bk.kind);
+      const bCell = game.resolveBuildCell(myIdx, cell, bk.kind);
+      const err = game.canBuildAt(myIdx, bCell, bk.kind);
       items.push({
         label: `${bk.label} bauen (${game.buildCostOf(myIdx, bk.kind)}€)`,
         disabled: !!err, hint: err || '',
-        action: () => sendIntent({ type: 'build', kind: bk.kind, cell })
+        action: () => sendIntent({ type: 'build', kind: bk.kind, cell: bCell })
       });
     }
   }

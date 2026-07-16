@@ -3,6 +3,20 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.9.0] – 2026-07-16
+
+### Hinzugefügt
+- **Geld-Popups**: Einnahmen aus Handelsschiffen und Zügen poppen über der
+  Geldanzeige auf (z.B. „+1,2k €"). Das Neuste steht direkt über dem Geld,
+  Ältere rutschen nach oben (max. 5), jedes bleibt 3 Sekunden sichtbar.
+- **Fabriken verbinden sich untereinander**: Fabriken in Reichweite (60 Felder)
+  werden Teil desselben Schienennetzes. Züge fahren durch, aber Fabriken
+  zahlen nichts – Geld gibt es weiterhin nur an Städten und Häfen.
+
+### Geändert
+- **Hafenbau großzügiger**: Ein Klick in Küstennähe reicht – der Hafen springt
+  automatisch auf die nächste eigene Küstenzelle (bis 8 Felder Entfernung).
+
 ## [0.8.1] – 2026-07-16
 
 ### Geändert

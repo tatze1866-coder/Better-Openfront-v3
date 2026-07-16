@@ -578,7 +578,14 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     for (const m of adjOf(n)) if (!seen.has(m)) { seen.add(m); stack.push(m); }
   }
   ok('Netze verschmelzen über eine gemeinsame Stadt', seen.has(f2), `${seen.size} Knoten im Netz`);
-  ok('Fabriken haben keine direkte Schiene zueinander', !adjOf(f1).includes(f2));
+  ok('Fabriken außer Reichweite: keine Direktschiene', !adjOf(f1).includes(f2));
+
+  // Fabrik in Reichweite (30 <= 60) wird direkt angeschlossen. Züge fahren
+  // durch, aber Fabriken zahlen nichts (payTrain gilt nur für Städte/Häfen).
+  const f3 = at(10, 40);
+  put(0, 'factory', f3);
+  gr.buildRailNetwork();
+  ok('Fabriken in Reichweite sind verbunden', adjOf(f1).includes(f3));
 
   // Bezahlung
   const A = gr.players[0], B = gr.players[1];
@@ -598,6 +605,51 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   gr.payTrain({ owner: 0 }, foreign);
   ok('Verbündete Station zahlt mehr als eine nicht-verbündete',
     A.money > notAllied && B.money === A.money, `${notAllied} € -> ${A.money} €`);
+
+  // Einnahmen erzeugen Events fürs HUD (Geld-Popups über der Geldanzeige)
+  gr.moneyEvents.length = 0;
+  gr.payTrain({ owner: 0 }, gr.buildingAt.get(c1));
+  ok('Zug-Einnahme erzeugt ein Geld-Event',
+    gr.moneyEvents.some(e => e.p === 0 && e.amount > 0));
+}
+
+// ---- Spiel 12b: Hafen-Klick snappt zur Küste ----
+{
+  const gp = newGame(21);
+  while (gp.phase === 'spawn') gp.turn([]);
+  const W = gp.map.w;
+  // Binnenzelle (nicht an der Küste) mit einer Küstenzelle im Umkreis 8 suchen
+  let inland = -1;
+  for (const c of gp.landCells) {
+    if (gp.isCoastal(c)) continue;
+    const x = c % W, y = (c / W) | 0;
+    if (x < 8 || y < 8 || x >= W - 8 || y >= gp.map.h - 8) continue;
+    for (let dy = -8; dy <= 8 && inland < 0; dy++) {
+      for (let dx = -8; dx <= 8; dx++) {
+        if (dx * dx + dy * dy > 64) continue;
+        const cc = (y + dy) * W + (x + dx);
+        if (gp.map.terrain[cc] === 1 && gp.isCoastal(cc)) { inland = c; break; }
+      }
+    }
+    if (inland >= 0) break;
+  }
+  ok('Binnenzelle nahe der Küste gefunden', inland >= 0);
+  // Umgebung dem Spieler zuschlagen, damit dort gebaut werden darf
+  const ix = inland % W, iy = (inland / W) | 0;
+  for (let dy = -8; dy <= 8; dy++) {
+    for (let dx = -8; dx <= 8; dx++) {
+      const cc = (iy + dy) * W + (ix + dx);
+      if (cc >= 0 && cc < gp.owner.length && gp.map.terrain[cc] === 1) gp.setOwner(cc, 0);
+    }
+  }
+  gp.players[0].money = 10000;
+  const snapped = gp.resolveBuildCell(0, inland, 'port');
+  ok('Hafen-Klick im Binnenland snappt zur Küste',
+    snapped !== inland && gp.isCoastal(snapped) && gp.owner[snapped] === 0);
+  gp.applyIntent({ p: 0, type: 'build', kind: 'port', cell: inland });
+  ok('Hafen wurde an der gesnappten Küstenzelle gebaut',
+    gp.buildings.some(b => b.kind === 'port' && b.owner === 0 && b.cell === snapped));
+  ok('Andere Gebäude snappen nicht', gp.resolveBuildCell(0, inland, 'city') === inland);
 }
 
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----
