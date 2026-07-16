@@ -291,6 +291,28 @@ ok('Team-Sieg: verbündete Überlebende gewinnen gemeinsam',
   const targets = new Set(gl.attacks.filter(a => a.attacker === 0 && a.pool > 0).map(a => a.target));
   ok('Mehrere Angriffe gleichzeitig (verschiedene Ziele)', targets.size >= 2,
     'Ziele: ' + [...targets].join(','));
+
+  // Gegenangriff mit ungleichen Kräften: die deutlich stärkere Front rückt in
+  // kürzerem Takt vor, damit sich der Schlagabtausch schnell entscheidet.
+  gl.attacks.length = 0;
+  gl.players[0].troops = 30000;
+  gl.players[1].troops = 30000;
+  gl.turn([
+    { p: 0, type: 'attack', target: 1, ratio: 0.5 },
+    { p: 1, type: 'attack', target: 0, ratio: 0.5 },
+  ]);
+  const s01 = gl.attacks.find(a => a.attacker === 0 && a.target === 1);
+  const s10 = gl.attacks.find(a => a.attacker === 1 && a.target === 0);
+  ok('Gleich starke Fronten rücken im gleichen Takt vor', !!s01 && !!s10 && s01.cd === s10.cd,
+    s01 && s10 ? `cd ${s01.cd} vs ${s10.cd}` : 'Angriff fehlt');
+  s01.pool = 20000;
+  s10.pool = 1000;
+  const terr0 = gl.players[0].territory;
+  for (let i = 0; i < 8; i++) gl.turn([]);
+  ok('Überlegene Front rückt schneller vor (kürzerer Takt)', s01.cd < s10.cd,
+    `cd stark ${s01.cd}, cd schwach ${s10.cd}`);
+  ok('Überlegene Front gewinnt netto Gebiet', gl.players[0].territory > terr0,
+    `Gebiet ${terr0} -> ${gl.players[0].territory}`);
 }
 
 // ---- Spiel 7: Preset-Karten (Weltkarte & Kontinente) ----

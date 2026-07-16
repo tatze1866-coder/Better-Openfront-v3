@@ -49,6 +49,7 @@ const ENEMY_COST_BASE = 1.4;
 const ENEMY_COST_DENSITY = 1.6;
 const NEUTRAL_INTERVAL = 3;          // gegen Neutral: Front alle 3 Ticks
 const ENEMY_INTERVAL = 5;            // gegen Spieler: etwas langsamer
+const CLASH_SPEED_CAP = 5;           // Gegenangriffe: max. Beschleunigung der stärkeren Front
 const WIN_FRACTION = 0.7;            // 70% des Landes = Sieg
 
 // Gebäude – werden mit Geld (€) gebaut.
@@ -960,7 +961,19 @@ export class Game {
       }
       // Front rückt im Takt vor (nicht jeden Tick)
       if (--atk.cd > 0) continue;
-      atk.cd = defender ? ENEMY_INTERVAL : NEUTRAL_INTERVAL;
+      let interval = defender ? ENEMY_INTERVAL : NEUTRAL_INTERVAL;
+      // Treffen zwei Angriffe frontal aufeinander (beide greifen sich gegen-
+      // seitig an), rückt die stärkere Front schneller vor: je größer das
+      // Verhältnis der Truppen-Pools, desto kürzer ihr Takt (bis CLASH_SPEED_CAP).
+      // So entscheidet sich ein Schlagabtausch zügig, statt sich hinzuziehen.
+      if (defender) {
+        const opp = this.attacks.find(a => a.attacker === atk.target && a.target === atk.attacker && a.pool > 0);
+        if (opp && atk.pool > opp.pool) {
+          const speed = Math.min(CLASH_SPEED_CAP, atk.pool / Math.max(1, opp.pool));
+          interval = Math.max(1, Math.round(interval / speed));
+        }
+      }
+      atk.cd = interval;
 
       // Die Front wird vor jedem Vorstoß frisch von der aktuellen Grenze
       // berechnet – so bleibt sie auch bei Gegenangriffen korrekt und

@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 const TURN_MS = 100;          // Takt: alle 100ms ein Zug (10 Zuege/Sekunde)
 const MAX_HUMANS = 5;         // max. menschliche Spieler pro Lobby
 const MAX_BOTS = 15;
-const MAP_SIZES = ['klein', 'mittel', 'gross'];
+const MAP_SIZES = ['klein', 'mittel', 'gross', 'riesig'];
 const MAP_TYPES = ['random', 'world', 'europe', 'asia', 'africa', 'namerica', 'samerica', 'australia'];
 
 // Statischer Webserver: liefert die Dateien aus public/ (Spiel-Client) aus.

@@ -3,6 +3,18 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.8.1] – 2026-07-16
+
+### Geändert
+- **Gegenangriffe entscheiden sich schneller**: Greifen sich zwei Spieler
+  gegenseitig an, rückt die stärkere Front in kürzerem Takt vor – je größer
+  das Truppen-Verhältnis, desto schneller (bis zu 5x). Ein Schlagabtausch
+  zieht sich damit nicht mehr endlos hin.
+
+### Behoben
+- **Riesige Karte in der Lobby wählbar**: Der Server kannte die Größe
+  „Riesig" nicht und setzte die Auswahl immer auf den alten Wert zurück.
+
 ## [0.8.0] – 2026-07-16
 
 ### Geändert
