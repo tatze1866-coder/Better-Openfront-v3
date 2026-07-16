@@ -43,6 +43,7 @@ export class Renderer {
     // ob gerade der Fabrik-Baumodus laeuft (dann Radius deutlicher zeichnen).
     this.myIdx = -1;
     this.factoryHint = false;
+    this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -434,6 +435,14 @@ export class Renderer {
         if (b.kind !== 'factory' || b.owner !== this.myIdx) continue;
         ctx.beginPath();
         ctx.arc(cx(b.cell), cy(b.cell), FACTORY_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Vorschau im Fabrik-Baumodus: Radius schon an der Zelle unter dem
+      // Cursor zeigen, BEVOR gebaut wird (hoverCell setzt main.js).
+      if (strong && this.hoverCell >= 0) {
+        ctx.strokeStyle = 'rgba(255, 214, 10, 0.9)';
+        ctx.beginPath();
+        ctx.arc(cx(this.hoverCell), cy(this.hoverCell), FACTORY_RADIUS, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();

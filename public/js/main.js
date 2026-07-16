@@ -906,10 +906,11 @@ function updateLbTip() {
     tip.style.right = (window.innerWidth - r.left + 10) + 'px';
     tip.style.top = Math.max(4, Math.min(r.top - 6, window.innerHeight - tip.offsetHeight - 6)) + 'px';
   } else {
-    // Auf der Karte: neben dem Mauszeiger (im Fenster halten)
+    // Karten-Hover: fest oben mittig am Bildschirmrand – verdeckt nie das
+    // Geschehen am Cursor. (Die eigenen Werte stehen unten im HUD.)
     tip.style.right = 'auto';
-    tip.style.left = Math.max(4, Math.min(mapHoverX + 16, window.innerWidth - tip.offsetWidth - 8)) + 'px';
-    tip.style.top = Math.max(4, Math.min(mapHoverY + 16, window.innerHeight - tip.offsetHeight - 8)) + 'px';
+    tip.style.left = Math.round((window.innerWidth - tip.offsetWidth) / 2) + 'px';
+    tip.style.top = '64px';
   }
 }
 
@@ -1037,13 +1038,17 @@ canvas.addEventListener('pointermove', e => {
   }
   if (!renderer || !game) return;
   const cell = renderer.screenToCell(e.clientX, e.clientY);
-  mapHoverIdx = cell >= 0 && game.map.terrain[cell] === 1 ? game.owner[cell] : -1;
+  renderer.hoverCell = cell; // für die Fabrik-Radius-Vorschau im Baumodus
+  // Eigenes Gebiet zeigt keinen Karten-Tooltip (die eigenen Werte stehen unten im HUD)
+  const o = cell >= 0 && game.map.terrain[cell] === 1 ? game.owner[cell] : -1;
+  mapHoverIdx = o === myIdx ? -1 : o;
   mapHoverX = e.clientX;
   mapHoverY = e.clientY;
-  updateLbTip(); // sofort nachführen, damit der Tooltip am Cursor klebt
+  updateLbTip();
 });
 canvas.addEventListener('pointerleave', () => {
   mapHoverIdx = -1;
+  if (renderer) renderer.hoverCell = -1;
   if (game) updateLbTip();
 });
 

@@ -303,9 +303,9 @@ button.primary:hover { background: #f4845f; }
 .build-row button.build-active { background: #e76f51; box-shadow: 0 0 0 2px #f4a261; }
 
 #toast {
-  /* Oben mittig (unter der Phasen-Anzeige), damit nichts vom unteren HUD
-     mit Truppen-/Geldanzeige verdeckt wird */
-  position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+  /* Oben mittig, unterhalb des Karten-Hover-Tooltips (top: 64px), damit sich
+     beide nie überlagern und das untere HUD frei bleibt */
+  position: absolute; top: 118px; left: 50%; transform: translateX(-50%);
   background: rgba(22, 40, 60, 0.95);
   border: 1px solid #f4a261;
   border-radius: 8px;

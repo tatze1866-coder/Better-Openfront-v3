@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.13.1] – 2026-07-16
+
+### Geändert
+- **Fabrik-Radius-Vorschau**: Im Fabrik-Baumodus zeigt ein gelber Kreis am
+  Mauszeiger schon VOR dem Bau, welche Städte/Häfen angeschlossen würden.
+- **Karten-Tooltip oben mittig**: Die Spieler-Infos beim Hover über fremdes
+  Gebiet erscheinen jetzt fest am oberen Bildschirmrand statt am Cursor –
+  und über eigenem Gebiet gar nicht (die eigenen Werte stehen unten im HUD).
+
 ## [0.13.0] – 2026-07-16
 
 ### Hinzugefügt
