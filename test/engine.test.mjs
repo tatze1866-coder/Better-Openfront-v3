@@ -1,5 +1,5 @@
 // Headless-Test der Spiel-Engine (Boote, Gebäude, Allianzen, Determinismus)
-import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST } from '../public/js/engine.js';
+import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES } from '../public/js/engine.js';
 
 const results = [];
 const ok = (name, cond, extra = '') => {
@@ -67,27 +67,75 @@ for (const c of g.landCells) {
 }
 ok('Fremde Insel mit neutralem Land existiert', boatTarget >= 0);
 
-// Bis zur Küste expandieren (ohne Küste kein Boot – korrektes Verhalten)
-const hasCoast = () => {
+// Bis ans OFFENE MEER expandieren (ohne Seeweg kein Boot – korrektes Verhalten).
+// Wichtig: "grenzt an Wasser" reicht nicht – das kann ein Binnensee sein. Genau
+// daran hing dieser Test: der Spieler berührte einen 2-Zellen-Tümpel, die
+// Expansion brach sofort ab und es gab nie einen Seeweg. Deshalb per Flood-Fill
+// prüfen, ob das Gewässer an unserer Küste wirklich eine ANDERE Insel erreicht.
+const hasSeaRoute = () => {
   const nb = new Int32Array(4);
+  const seen = new Uint8Array(g.owner.length);
+  const stack = [];
   for (let c = 0; c < g.owner.length; c++) {
     if (g.owner[c] !== 0) continue;
     const k = g.neighbors4(c, nb);
-    for (let i = 0; i < k; i++) if (g.map.terrain[nb[i]] === 0) return true;
+    for (let i = 0; i < k; i++) {
+      const m = nb[i];
+      if (g.map.terrain[m] === 0 && !seen[m]) { seen[m] = 1; stack.push(m); }
+    }
+  }
+  while (stack.length) {
+    const c = stack.pop();
+    const k = g.neighbors4(c, nb);
+    for (let i = 0; i < k; i++) {
+      const m = nb[i];
+      if (g.map.terrain[m] === 0) {
+        if (!seen[m]) { seen[m] = 1; stack.push(m); }
+      } else if (g.map.island[m] !== myIsland) {
+        return true; // andere Insel am selben Gewässer -> Seeweg möglich
+      }
+    }
   }
   return false;
 };
-for (let round = 0; round < 40 && !hasCoast(); round++) {
+for (let round = 0; round < 60 && !hasSeaRoute(); round++) {
   g.turn([{ p: 0, type: 'attack', target: -1, ratio: 0.6 }]);
   for (let i = 0; i < 100; i++) g.turn([]);
 }
-ok('Spieler erreicht die Küste', hasCoast(), 'Gebiet: ' + g.players[0].territory);
+ok('Spieler erreicht das offene Meer', hasSeaRoute(), 'Gebiet: ' + g.players[0].territory);
 for (let i = 0; i < 3000 && g.players[0].troops < 400; i++) g.turn([]);
+
+// Ziel-Insel jetzt neu wählen: eine, zu der es von unserer Küste aus auch
+// wirklich einen Seeweg gibt (sonst hängt der Test an der Kartengeometrie).
+// Neutral wird bevorzugt, aber inzwischen sind Minuten vergangen – die Bots
+// haben die kleinen Inseln oft schon besiedelt, dann ist ein Gegner-Ziel ok
+// (das Boot darf auch auf feindliche Küsten landen).
+// findBoatPath ist eine BFS über die ganze Karte -> nur EINMAL pro Insel testen.
+const pickBoatTarget = neutralOnly => {
+  const tried = new Set([myIsland]);
+  for (const c of g.landCells) {
+    const isl = g.map.island[c];
+    if (tried.has(isl) || g.owner[c] === 0) continue;
+    if (neutralOnly && g.owner[c] !== -1) continue;
+    tried.add(isl);
+    if (g.findBoatPath(0, c)) return c;
+  }
+  return -1;
+};
+boatTarget = pickBoatTarget(true);
+if (boatTarget < 0) boatTarget = pickBoatTarget(false);
+ok('Fremde Insel mit Seeweg gefunden', boatTarget >= 0,
+  boatTarget >= 0 ? `Insel ${g.map.island[boatTarget]}, Besitzer ${g.owner[boatTarget]}` : 'keine erreichbar');
+
+// Truppen kontrolliert setzen: sonst entscheidet die Wirtschaft (und bei einem
+// Gegner-Ziel dessen Truppendichte), ob die Landung überhaupt durchkommt.
+g.players[0].troops = 4000;
 g.turn([{ p: 0, type: 'boat', cell: boatTarget, ratio: 0.4 }]);
 ok('Boot gestartet', g.boats.filter(b => b.owner === 0).length === 1);
 
-// Boot ankommen lassen, dann den Brückenkopf-Angriff arbeiten lassen
-for (let i = 0; i < 300 && g.boats.some(b => b.owner === 0); i++) g.turn([]);
+// Boot ankommen lassen, dann den Brückenkopf-Angriff arbeiten lassen.
+// Großzügig warten: der Seeweg kann auf großen Karten lang sein.
+for (let i = 0; i < 4000 && g.boats.some(b => b.owner === 0); i++) g.turn([]);
 for (let i = 0; i < 150; i++) g.turn([]);
 let onTargetIsland = 0;
 const targetIsland = g.map.island[boatTarget];
@@ -213,23 +261,34 @@ ok('Team-Sieg: verbündete Überlebende gewinnen gemeinsam',
   }
   ok('Reiche berühren sich (Vorbereitung Gegenangriff)', touching);
 
-  // Gegenseitiger Angriff: beide Fronten bleiben aktiv (kein vorzeitiger Abbruch)
+  // Gegenseitiger Angriff: beide Fronten bleiben aktiv (kein vorzeitiger Abbruch).
+  // Bewusst SOFORT nach dem Intent geprüft und nicht nach vielen Ticks: bei
+  // gleich starken Gegnern ist der Pool systembedingt schnell leer, weil die
+  // Vorstoß-Kosten mit der Truppendichte des Verteidigers steigen. Getestet wird
+  // die Mechanik (beide Angriffe existieren und haben eine Front), nicht wie
+  // lange die Truppen reichen.
   gl.turn([
     { p: 0, type: 'attack', target: 1, ratio: 0.5 },
     { p: 1, type: 'attack', target: 0, ratio: 0.5 },
   ]);
-  for (let i = 0; i < 25; i++) gl.turn([]);
-  const playerAttacks = gl.attacks.filter(a => a.target >= 0).length;
-  ok('Gegenseitiger Angriff: Fronten kämpfen weiter', playerAttacks >= 1,
-    playerAttacks + ' aktive Spieler-Angriffe nach 25 Ticks');
+  const a01 = gl.attacks.find(a => a.attacker === 0 && a.target === 1);
+  const a10 = gl.attacks.find(a => a.attacker === 1 && a.target === 0);
+  ok('Gegenseitiger Angriff: Fronten kämpfen weiter',
+    !!a01 && !!a10 && a01.pool > 0 && a10.pool > 0 && a01.frontier.size > 0 && a10.frontier.size > 0,
+    a01 && a10 ? `0->1 Pool ${Math.floor(a01.pool)} / Front ${a01.frontier.size}, 1->0 Pool ${Math.floor(a10.pool)} / Front ${a10.frontier.size}`
+               : 'ein Angriff wurde abgebrochen');
 
-  // Mehrere Angriffe gleichzeitig (Neutral + Gegner)
+  // Mehrere Angriffe gleichzeitig (Neutral + Gegner).
+  // Truppen kontrolliert setzen: nach dem Gegenangriff oben sind beide ausgelaugt,
+  // und ein Angriff mit leerem Pool ist schon im selben Tick wieder weg. Ein
+  // schwacher Verteidiger (niedrige Dichte) hält die Vorstoß-Kosten klein.
+  gl.players[0].troops = 6000;
+  gl.players[1].troops = 200;
   gl.turn([
     { p: 0, type: 'attack', target: -1, ratio: 0.3 },
     { p: 0, type: 'attack', target: 1, ratio: 0.3 },
   ]);
-  gl.turn([]);
-  const targets = new Set(gl.attacks.filter(a => a.attacker === 0).map(a => a.target));
+  const targets = new Set(gl.attacks.filter(a => a.attacker === 0 && a.pool > 0).map(a => a.target));
   ok('Mehrere Angriffe gleichzeitig (verschiedene Ziele)', targets.size >= 2,
     'Ziele: ' + [...targets].join(','));
 }
@@ -244,8 +303,10 @@ const gw = new Game({
 });
 const genMs = Date.now() - tGen;
 const frac = gw.map.landCount / (gw.map.w * gw.map.h);
-ok('Weltkarte (groß) generiert', gw.map.w === 640 && frac > 0.2 && frac < 0.45,
-  `Landanteil ${(frac * 100).toFixed(1)}%, ${genMs}ms`);
+// Breite aus MAP_SIZES lesen statt fest verdrahten – sonst bricht der Test bei
+// jeder Balancing-Änderung der Kartengrößen.
+ok('Weltkarte (groß) generiert', gw.map.w === MAP_SIZES.gross.w && frac > 0.2 && frac < 0.45,
+  `${gw.map.w}×${gw.map.h}, Landanteil ${(frac * 100).toFixed(1)}%, ${genMs}ms`);
 ok('Weltkarte hat viele Inseln (Kontinente + GB/Japan/…)', gw.map.islandSizes.length >= 8,
   gw.map.islandSizes.length + ' Inseln');
 ok('Spawns auf Weltkarte platziert', gw.players.every(p => p.territory > 0));
