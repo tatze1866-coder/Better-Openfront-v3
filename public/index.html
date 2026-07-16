@@ -126,7 +126,7 @@
         <button id="btnSettings" class="icon-btn" type="button" data-i18n-title="settingsIconTitle">
           <svg viewBox="0 0 24 24" fill="#d4af6a" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 000-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 00-1.7-1L14.9 2.4h-4L10.5 5a7.6 7.6 0 00-1.7 1l-2.4-1-2 3.4L4.4 11a7.6 7.6 0 000 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 001.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 001.7-1l2.4 1 2-3.4-2-1.6zM12 15.4a3.4 3.4 0 110-6.8 3.4 3.4 0 010 6.8z"/></svg>
         </button>
-        <button class="icon-btn" type="button" data-i18n-title="guideIconTitle">
+        <button id="btnGuide" class="icon-btn" type="button" data-i18n-title="guideIconTitle">
           <svg viewBox="0 0 24 24" fill="none" stroke="#d4af6a" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 6c-2.2-1.3-4.8-1.6-7.5-1.1v13c2.7-.5 5.3-.2 7.5 1.1 2.2-1.3 4.8-1.6 7.5-1.1v-13C16.8 4.4 14.2 4.7 12 6z"/><path d="M12 6v13"/></svg>
         </button>
         <button class="icon-btn" type="button" data-i18n-title="statsIconTitle">
@@ -275,6 +275,74 @@
           <button id="btnBackToMenu" class="primary">Zurück zum Menü</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Anleitung-Dialog (Guide Modal) -->
+  <div id="guideOverlay" class="guide-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <div class="guide-dialog">
+      <div class="guide-header">
+        <h2 id="guideTitle" data-i18n="guideTitle">Anleitung</h2>
+        <button id="btnGuideClose" class="guide-close" type="button" aria-label="Schließen">✕</button>
+      </div>
+
+      <div class="guide-content">
+        <div class="guide-section">
+          <h3 data-i18n="guideSteering">⌨ Steuerung</h3>
+          <div class="guide-text" data-i18n="guideSteeringText">Bewege die Karte mit <b>W A S D</b> oder den <b>Pfeiltasten</b>. Zoome mit dem <b>Mausrad</b>. Klicke auf die <b>Minimap</b> unten rechts, um schnell zu einer Stelle zu springen.</div>
+        </div>
+
+        <div class="guide-section">
+          <h3 data-i18n="guideAttack">⚔ Angreifen</h3>
+          <div class="guide-text" data-i18n="guideAttackText"><b>Linksklick</b> auf gegnerisches oder neutrales Gebiet, um anzugreifen. Der Schieber unten bestimmt, welcher Prozentsatz deiner Truppen losgeht. Auf fremde Inseln schickst du automatisch ein <b>Boot</b>.</div>
+        </div>
+
+        <div class="guide-section">
+          <h3 data-i18n="guideBuildings">🏗 Gebäude</h3>
+          <div class="guide-building">
+            <div class="guide-building-item">
+              <span class="guide-icon">🏙</span>
+              <div>
+                <b data-i18n="guideCityName">Stadt</b> (250 €)
+                <div class="guide-desc" data-i18n="guideCityDesc">Erhöht dein Truppenlimit und das Wachstum. Preise verdoppeln sich mit jeder weiteren Stadt.</div>
+              </div>
+            </div>
+            <div class="guide-building-item">
+              <span class="guide-icon">🛡</span>
+              <div>
+                <b data-i18n="guideFortName">Festung</b> (200 €)
+                <div class="guide-desc" data-i18n="guideFortDesc">Verdoppelt die Verteidigung in ihrem Umkreis. Angreifer verlieren 5x mehr Truppen.</div>
+              </div>
+            </div>
+            <div class="guide-building-item">
+              <span class="guide-icon">⚓</span>
+              <div>
+                <b data-i18n="guidePortName">Hafen</b> (250 €)
+                <div class="guide-desc" data-i18n="guidePortDesc">Braucht Küste. Handelsschiffe bringen Geld. Hier kannst du <b>Kriegsschiffe</b> (300 €) bauen.</div>
+              </div>
+            </div>
+            <div class="guide-building-item">
+              <span class="guide-icon">🏭</span>
+              <div>
+                <b data-i18n="guideFactoryName">Fabrik</b> (400 €)
+                <div class="guide-desc" data-i18n="guideFactoryDesc">Verbindet Städte und Häfen mit Schienen. Züge spawnen und bringen Geld bei jeder Station.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 data-i18n="guideAlliance">🤝 Allianzen</h3>
+          <div class="guide-text" data-i18n="guideAllianceText">Klicke auf einen Namen in der <b>Rangliste</b> (rechts oben), um eine Allianz anzufragen. Verbündete können sich nicht angreifen. Halten Verbündete zusammen 70 % des Landes, gewinnen alle!</div>
+        </div>
+
+        <div class="guide-section">
+          <h3 data-i18n="guideWin">🏆 Ziel</h3>
+          <div class="guide-text" data-i18n="guideWinText">Erobere <b>70 % der Karte</b> oder sei der Letzte, der übrig bleibt. Mit Allianzen könnt ihr auch zusammen gewinnen!</div>
+        </div>
+      </div>
+
+      <button id="btnGuideCloseBottom" class="guide-close-btn" type="button" data-i18n="closeBtn">Schließen</button>
     </div>
   </div>
 

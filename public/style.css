@@ -1042,3 +1042,188 @@ button.primary:hover { background: #f4845f; }
   pointer-events: none;
   z-index: 5;
 }
+
+/* =========================================================================
+   ANLEITUNG-DIALOG (Guide Modal)
+   ========================================================================= */
+
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 12, 20, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(3px);
+  animation: guideFadeIn 0.18s ease;
+}
+.guide-overlay.hidden { display: none !important; }
+
+@keyframes guideFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.guide-dialog {
+  position: relative;
+  width: min(520px, 92vw);
+  max-height: 85vh;
+  background: linear-gradient(180deg, rgba(12, 22, 33, 0.97), rgba(10, 18, 27, 0.99));
+  border: 1px solid #d4af6a;
+  border-radius: 6px;
+  outline: 5px solid rgba(9, 16, 24, 0.55);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 6px #6b5423,
+    0 0 0 7px #d4af6a,
+    0 20px 60px rgba(0, 0, 0, 0.7);
+  padding: 28px 32px 24px;
+  display: flex;
+  flex-direction: column;
+  animation: guideSlideIn 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes guideSlideIn {
+  from { transform: translateY(-18px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(212, 175, 106, 0.35);
+}
+
+.guide-header h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #d4af6a;
+  margin: 0;
+  padding: 0;
+}
+.guide-header h2::after { display: none; }
+
+.guide-close {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  font-size: 16px !important;
+  font-weight: 700;
+  color: #c9b98a !important;
+  background: rgba(107, 84, 35, 0.25) !important;
+  border: 1px solid #6b5423 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.guide-close:hover {
+  background: rgba(212, 175, 106, 0.25) !important;
+  border-color: #d4af6a !important;
+  color: #f0d68a !important;
+}
+
+.guide-content {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 18px;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #6b5423 transparent;
+}
+
+.guide-section {
+  margin-bottom: 20px;
+}
+
+.guide-section h3 {
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #d4af6a;
+  margin: 0 0 10px 0;
+  padding: 0;
+}
+
+.guide-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 14px;
+  color: #c9b98a;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.guide-text b {
+  color: #f0d68a;
+  font-weight: 600;
+}
+
+.guide-building {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-building-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(107, 84, 35, 0.15);
+  border-radius: 5px;
+  border: 1px solid rgba(212, 175, 106, 0.2);
+}
+
+.guide-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+}
+
+.guide-building-item b {
+  color: #f0d68a;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.guide-desc {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 13px;
+  color: #b9a87a;
+  line-height: 1.4;
+}
+
+.guide-close-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0;
+  padding: 12px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 2px;
+  font-size: 14px;
+  background: linear-gradient(180deg, #2f6198, #173a5c);
+  border: 1px solid #d4af6a;
+  color: #f0e6c8;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: background 0.15s;
+}
+.guide-close-btn:hover {
+  background: linear-gradient(180deg, #3a75b5, #1d4a73);
+}

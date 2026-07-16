@@ -80,10 +80,33 @@ $('settingsOverlay').addEventListener('click', e => {
   if (e.target === $('settingsOverlay')) closeSettings();
 });
 
-// Escape-Taste schließt den Dialog
+// Guide-Dialog öffnen/schließen
+function openGuide() {
+  $('guideOverlay').classList.remove('hidden');
+}
+
+function closeGuide() {
+  $('guideOverlay').classList.add('hidden');
+}
+
+// Guide-Button: Buch-Icon
+$('btnGuide').addEventListener('click', openGuide);
+$('btnGuideClose').addEventListener('click', closeGuide);
+$('btnGuideCloseBottom').addEventListener('click', closeGuide);
+
+// Overlay-Hintergrund schließt den Dialog
+$('guideOverlay').addEventListener('click', e => {
+  if (e.target === $('guideOverlay')) closeGuide();
+});
+
+// Escape-Taste schließt den Dialog (Settings oder Guide)
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('settingsOverlay').classList.contains('hidden')) {
-    closeSettings();
+  if (e.key === 'Escape') {
+    if (!$('settingsOverlay').classList.contains('hidden')) {
+      closeSettings();
+    } else if (!$('guideOverlay').classList.contains('hidden')) {
+      closeGuide();
+    }
   }
 });
 

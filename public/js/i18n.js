@@ -10,7 +10,7 @@ const dict = {
   languageLabel: { de: 'Sprache', en: 'Language' },
   closeBtn: { de: 'Schließen', en: 'Close' },
   settingsIconTitle: { de: 'Einstellungen', en: 'Settings' },
-  guideIconTitle: { de: 'Anleitung (bald verfügbar)', en: 'Guide (coming soon)' },
+  guideIconTitle: { de: 'Anleitung', en: 'Guide' },
   statsIconTitle: { de: 'Statistik (bald verfügbar)', en: 'Stats (coming soon)' },
   volumeLabel: { de: 'Lautstärke', en: 'Volume' },
   animationsLabel: { de: 'Animationen', en: 'Animations' },
@@ -219,3 +219,23 @@ export function applyStaticTranslations(root = document) {
 }
 
 document.documentElement.lang = lang;
+
+  // ---------- Anleitung (Guide) ----------
+  guideTitle: { de: 'Anleitung', en: 'Guide' },
+  guideSteering: { de: '⌨ Steuerung', en: '⌨ Controls' },
+  guideSteeringText: { de: 'Bewege die Karte mit <b>W A S D</b> oder den <b>Pfeiltasten</b>. Zoome mit dem <b>Mausrad</b>. Klicke auf die <b>Minimap</b> unten rechts, um schnell zu einer Stelle zu springen.', en: 'Move the map with <b>W A S D</b> or <b>arrow keys</b>. Zoom with the <b>mouse wheel</b>. Click the <b>minimap</b> in the bottom right to jump to a location.' },
+  guideAttack: { de: '⚔ Angreifen', en: '⚔ Attack' },
+  guideAttackText: { de: '<b>Linksklick</b> auf gegnerisches oder neutrales Gebiet, um anzugreifen. Der Schieber unten bestimmt, welcher Prozentsatz deiner Truppen losgeht. Auf fremde Inseln schickst du automatisch ein <b>Boot</b>.', en: '<b>Left-click</b> on enemy or neutral territory to attack. The slider at the bottom determines what percentage of your troops are sent. To other islands, you automatically send a <b>boat</b>.' },
+  guideBuildings: { de: '🏗 Gebäude', en: '🏗 Buildings' },
+  guideCityName: { de: 'Stadt', en: 'City' },
+  guideCityDesc: { de: 'Erhöht dein Truppenlimit und das Wachstum. Preise verdoppeln sich mit jeder weiteren Stadt.', en: 'Increases your troop limit and growth. Prices double with each additional city.' },
+  guideFortName: { de: 'Festung', en: 'Fort' },
+  guideFortDesc: { de: 'Verdoppelt die Verteidigung in ihrem Umkreis. Angreifer verlieren 5x mehr Truppen.', en: 'Doubles defense in its radius. Attackers lose 5x more troops.' },
+  guidePortName: { de: 'Hafen', en: 'Port' },
+  guidePortDesc: { de: 'Braucht Küste. Handelsschiffe bringen Geld. Hier kannst du <b>Kriegsschiffe</b> (300 €) bauen.', en: 'Needs coast. Trade ships bring money. Build <b>warships</b> (300 €) here.' },
+  guideFactoryName: { de: 'Fabrik', en: 'Factory' },
+  guideFactoryDesc: { de: 'Verbindet Städte und Häfen mit Schienen. Züge spawnen und bringen Geld bei jeder Station.', en: 'Connects cities and ports with rails. Trains spawn and bring money at each station.' },
+  guideAlliance: { de: '🤝 Allianzen', en: '🤝 Alliances' },
+  guideAllianceText: { de: 'Klicke auf einen Namen in der <b>Rangliste</b> (rechts oben), um eine Allianz anzufragen. Verbündete können sich nicht angreifen. Halten Verbündete zusammen 70 % des Landes, gewinnen alle!', en: 'Click a name in the <b>leaderboard</b> (top right) to request an alliance. Allies cannot attack each other. If allies hold 70 % of the land together, everyone wins!' },
+  guideWin: { de: '🏆 Ziel', en: '🏆 Goal' },
+  guideWinText: { de: 'Erobere <b>70 % der Karte</b> oder sei der Letzte, der übrig bleibt. Mit Allianzen könnt ihr auch zusammen gewinnen!', en: 'Conquer <b>70 % of the map</b> or be the last one standing. With alliances, you can also win together!' },
