@@ -3,6 +3,16 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.10.1] – 2026-07-16
+
+### Geändert
+- **Höhere Kampfverluste**: Im Gefecht sterben Truppen jetzt rund doppelt so
+  schnell – auf beiden Seiten. Angreifer verlieren pro Gegner-Zelle mehr aus
+  dem Pool (2,8 + Dichte×3,2 statt 1,4 + Dichte×1,6), Verteidiger pro Zelle
+  mehr Truppen (Dichte×1,8 statt ×0,9). Armeen schmelzen im Kampf schneller
+  dahin, statt sich hinzuziehen. Die Expansion ins neutrale Land bleibt
+  unverändert günstig.
+
 ## [0.10.0] – 2026-07-16
 
 ### Geändert

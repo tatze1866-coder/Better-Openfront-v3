@@ -44,9 +44,12 @@ const MONEY_PER_TERRITORY = 0.0004;  // € pro Tick und Zelle
 
 // Kampf: Angriffe rücken als geschlossene Linie vor – die komplette
 // Front fällt auf einmal, im festen Takt (Ticks pro Vorstoß).
-const NEUTRAL_COST = 1.0;
-const ENEMY_COST_BASE = 1.4;
-const ENEMY_COST_DENSITY = 1.6;
+// Die Verluste sind bewusst hoch (rund doppelt so hart wie ursprünglich),
+// damit Armeen im Gefecht schnell dahinschmelzen statt sich hinzuziehen.
+const NEUTRAL_COST = 1.0;            // Expansion ins Neutrale bleibt günstig
+const ENEMY_COST_BASE = 2.8;         // Grundverlust des Angreifers je Gegner-Zelle
+const ENEMY_COST_DENSITY = 3.2;      // + Aufschlag nach Truppendichte des Verteidigers
+const DEFENDER_LOSS_PER_CELL = 1.8;  // Verteidiger-Verlust je verlorener Zelle (× Dichte)
 const NEUTRAL_INTERVAL = 3;          // gegen Neutral: Front alle 3 Ticks
 const ENEMY_INTERVAL = 5;            // gegen Spieler: etwas langsamer
 const CLASH_SPEED_CAP = 5;           // Gegenangriffe: max. Beschleunigung der stärkeren Front
@@ -1072,7 +1075,7 @@ export class Game {
         if (atk.pool < cellCost) continue; // z.B. Festungszelle zu teuer
         atk.pool -= cellCost;
         if (defender) {
-          defender.troops = Math.max(0, defender.troops - density * 0.9);
+          defender.troops = Math.max(0, defender.troops - density * DEFENDER_LOSS_PER_CELL);
         }
         this.setOwner(cell, atk.attacker);
         captured++;
