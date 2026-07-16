@@ -3,6 +3,18 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.11.1] – 2026-07-16
+
+### Geändert
+- **Fabriken gebufft**: Züge zahlen das Doppelte je Station (eigene 12 €,
+  fremde 24 €, verbündete 36 €).
+- **Häfen abgeschwächt**: Handelsgold halbiert (20 € Basis + 0,3 je
+  Wegzelle^1,1) – Fabriken sind jetzt die stärkere Geldquelle.
+- **Übermacht beschleunigt Angriffe**: Je größer der Angriffs-Pool im
+  Verhältnis zu den haltenden Truppen des Verteidigers, desto schneller
+  rückt die Front vor (bis 4x). Sie bleibt dabei eine geschlossene Linie
+  an der Grenze – Angriffslinien bilden sich weiterhin.
+
 ## [0.11.0] – 2026-07-16
 
 ### Hinzugefügt
