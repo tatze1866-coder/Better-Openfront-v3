@@ -844,12 +844,16 @@ $('leaderboard').addEventListener('mouseleave', () => {
 });
 
 // Details zum gehoverten Spieler: Name, Truppen, Gebiet und Gebäude je Typ.
+// Quelle ist entweder eine Ranglisten-Zeile ODER die Zelle unter dem Cursor
+// auf der Karte (mapHoverIdx) – beide zeigen denselben Tooltip.
 // Wird im HUD-Takt aktualisiert, damit die Werte live mitlaufen.
 function updateLbTip() {
   const tip = $('lbTip');
-  const p = lbHoverIdx >= 0 ? game.players[lbHoverIdx] : null;
-  const row = p ? lbRows.get(p.idx) : null;
-  if (!p || !row) { tip.classList.add('hidden'); return; }
+  const fromLb = lbHoverIdx >= 0;
+  const idx = fromLb ? lbHoverIdx : mapHoverIdx;
+  const p = idx >= 0 ? game.players[idx] : null;
+  const row = fromLb && p ? lbRows.get(p.idx) : null;
+  if (!p || (fromLb && !row)) { tip.classList.add('hidden'); return; }
 
   tip.innerHTML = '';
   const head = document.createElement('div');
@@ -894,12 +898,19 @@ function updateLbTip() {
     tip.appendChild(d);
   }
 
-  // Links neben der Rangliste, auf Höhe der Zeile (im Fenster halten)
   tip.classList.remove('hidden');
-  const r = row.getBoundingClientRect();
-  tip.style.left = 'auto';
-  tip.style.right = (window.innerWidth - r.left + 10) + 'px';
-  tip.style.top = Math.max(4, Math.min(r.top - 6, window.innerHeight - tip.offsetHeight - 6)) + 'px';
+  if (fromLb) {
+    // Links neben der Rangliste, auf Höhe der Zeile (im Fenster halten)
+    const r = row.getBoundingClientRect();
+    tip.style.left = 'auto';
+    tip.style.right = (window.innerWidth - r.left + 10) + 'px';
+    tip.style.top = Math.max(4, Math.min(r.top - 6, window.innerHeight - tip.offsetHeight - 6)) + 'px';
+  } else {
+    // Auf der Karte: neben dem Mauszeiger (im Fenster halten)
+    tip.style.right = 'auto';
+    tip.style.left = Math.max(4, Math.min(mapHoverX + 16, window.innerWidth - tip.offsetWidth - 8)) + 'px';
+    tip.style.top = Math.max(4, Math.min(mapHoverY + 16, window.innerHeight - tip.offsetHeight - 8)) + 'px';
+  }
 }
 
 // ---------- Laufende Angriffe ----------
@@ -1008,15 +1019,32 @@ canvas.addEventListener('pointerdown', e => {
   try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetische Events */ }
 });
 
+// Maus über der Karte: Besitzer der Zelle unterm Cursor (für den Stats-Tooltip,
+// gleicher Inhalt wie beim Hover über die Rangliste)
+let mapHoverIdx = -1, mapHoverX = 0, mapHoverY = 0;
+
 canvas.addEventListener('pointermove', e => {
-  if (!pointerDown || !renderer) return;
-  const dx = e.clientX - lastX, dy = e.clientY - lastY;
-  if (panned || Math.abs(dx) + Math.abs(dy) > 4) {
-    panned = true;
-    renderer.pan(dx, dy);
-    lastX = e.clientX;
-    lastY = e.clientY;
+  if (pointerDown && renderer) {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (panned || Math.abs(dx) + Math.abs(dy) > 4) {
+      panned = true;
+      renderer.pan(dx, dy);
+      lastX = e.clientX;
+      lastY = e.clientY;
+    }
+    mapHoverIdx = -1; // beim Pannen keinen Tooltip zeigen
+    return;
   }
+  if (!renderer || !game) return;
+  const cell = renderer.screenToCell(e.clientX, e.clientY);
+  mapHoverIdx = cell >= 0 && game.map.terrain[cell] === 1 ? game.owner[cell] : -1;
+  mapHoverX = e.clientX;
+  mapHoverY = e.clientY;
+  updateLbTip(); // sofort nachführen, damit der Tooltip am Cursor klebt
+});
+canvas.addEventListener('pointerleave', () => {
+  mapHoverIdx = -1;
+  if (game) updateLbTip();
 });
 
 // Besitze ich Zellen auf dieser Insel? (entscheidet Landangriff vs. Boot)

@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.12.1] – 2026-07-16
+
+### Geändert
+- **Meldungen verdecken nichts mehr**: Hinweise wie „Nicht genug Geld"
+  erscheinen jetzt oben mittig statt direkt über der Truppenanzeige.
+- **Spieler-Infos direkt auf der Karte**: Maus über fremdes Gebiet zeigt
+  denselben Stats-Tooltip wie die Rangliste (Name, Truppen, Geld, Gebiet,
+  Gebäude) – direkt neben dem Mauszeiger.
+
 ## [0.12.0] – 2026-07-16
 
 ### Hinzugefügt
