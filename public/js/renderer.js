@@ -56,9 +56,15 @@ export class Renderer {
     this.colors = game.players.map(p => hexToRgb(p.color));
     this.colorsEdge = this.colors.map(c => darken(c, 0.62));
 
+    // Cache fuer die Namens-Label-Positionen (groesste Flaeche je Spieler),
+    // wird nur periodisch neu berechnet (siehe updateLabels).
+    this.labelCache = new Map();
+    this.lastLabelUpdate = -Infinity;
+
     this.resize();
     // Start: Karte einpassen (scale = Zoom, ox/oy = Verschiebung/Pan)
-    const s = Math.min(canvas.width / w, canvas.height / h) * 0.95;
+    // x3: die Karte startet dreimal so groß / reingezoomt wie vorher.
+    const s = Math.min(canvas.width / w, canvas.height / h) * 0.95 * 3;
     this.scale = s;
     this.ox = (canvas.width - w * s) / 2;
     this.oy = (canvas.height - h * s) / 2;
@@ -157,9 +163,96 @@ export class Renderer {
     this.oy = this.canvas.height / 2 - mapY * this.scale;
   }
 
+  // Fuer jeden Spieler die groesste zusammenhaengende Landflaeche finden
+  // (Flood-Fill ueber gleich-besitzte, benachbarte Landzellen) und deren
+  // Schwerpunkt (Mittelpunkt) merken. Laeuft nur ~1x/Sekunde, nicht pro Frame,
+  // da ein voller Durchlauf ueber die Karte etwas kostet.
+  updateLabels(now) {
+    if (now - this.lastLabelUpdate < 1000) return;
+    this.lastLabelUpdate = now;
+
+    const g = this.game;
+    const w = g.map.w, h = g.map.h;
+    const n = w * h;
+    const visited = new Uint8Array(n);
+    const bestByOwner = new Map(); // idx -> { count, x, y }
+    const stack = [];
+
+    for (let start = 0; start < n; start++) {
+      if (visited[start]) continue;
+      if (g.map.terrain[start] !== 1 || g.owner[start] < 0) { visited[start] = 1; continue; }
+
+      const o = g.owner[start];
+      visited[start] = 1;
+      stack.length = 0;
+      stack.push(start);
+      let count = 0, sx = 0, sy = 0;
+
+      while (stack.length) {
+        const c = stack.pop();
+        count++;
+        sx += c % w;
+        sy += (c / w) | 0;
+        const x = c % w, y = (c / w) | 0;
+        if (x > 0) {
+          const nb = c - 1;
+          if (!visited[nb] && g.map.terrain[nb] === 1 && g.owner[nb] === o) { visited[nb] = 1; stack.push(nb); }
+        }
+        if (x < w - 1) {
+          const nb = c + 1;
+          if (!visited[nb] && g.map.terrain[nb] === 1 && g.owner[nb] === o) { visited[nb] = 1; stack.push(nb); }
+        }
+        if (y > 0) {
+          const nb = c - w;
+          if (!visited[nb] && g.map.terrain[nb] === 1 && g.owner[nb] === o) { visited[nb] = 1; stack.push(nb); }
+        }
+        if (y < h - 1) {
+          const nb = c + w;
+          if (!visited[nb] && g.map.terrain[nb] === 1 && g.owner[nb] === o) { visited[nb] = 1; stack.push(nb); }
+        }
+      }
+
+      const cur = bestByOwner.get(o);
+      if (!cur || count > cur.count) {
+        bestByOwner.set(o, { count, x: sx / count, y: sy / count });
+      }
+    }
+
+    this.labelCache = bestByOwner;
+  }
+
+  // Spielernamen zentriert auf der groessten Flaeche zeichnen (Bildschirm-
+  // koordinaten, analog zu drawBadges — daher nach dem Zuruecksetzen der
+  // Transform aufrufen).
+  drawLabels(ctx) {
+    const g = this.game;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#000';
+
+    for (const [idx, info] of this.labelCache) {
+      const p = g.players[idx];
+      if (!p || !p.alive) continue;
+
+      const px = info.x * this.scale + this.ox;
+      const py = info.y * this.scale + this.oy;
+      if (px < -100 || py < -40 || px > this.canvas.width + 100 || py > this.canvas.height + 40) continue;
+
+      // Schriftgroesse waechst mit Flaeche & Zoom, aber begrenzt (nicht zu klein/gross)
+      const areaScale = Math.sqrt(info.count) * this.scale;
+      const fontSize = Math.max(9, Math.min(22, areaScale * 0.28));
+      if (fontSize < 9.5) continue; // zu winzig -> weglassen statt Buchstabensalat
+
+      ctx.font = `700 ${fontSize}px 'Segoe UI', sans-serif`;
+      ctx.fillText(p.name, px, py);
+    }
+    ctx.restore();
+  }
+
   // Ein kompletter Frame: Hintergrund, hochskalierte Karte, Overlays (in
-  // Kartenkoordinaten), danach Badges/Minimap (in Bildschirmkoordinaten).
-  draw() {
+  // Kartenkoordinaten), danach Badges/Labels/Minimap (in Bildschirmkoordinaten).
+  draw(now = performance.now()) {
     // Nur wenn sich Zellen geaendert haben, die Rohpixel ins Offscreen schreiben.
     if (this.imgDirty) {
       this.offCtx.putImageData(this.img, 0, 0);
@@ -175,6 +268,10 @@ export class Renderer {
     this.drawOverlays(ctx);              // Gebaeude/Schiffe/Zuege darueber
     ctx.setTransform(1, 0, 0, 1, 0, 0);  // zurueck zu Bildschirmkoordinaten
     this.drawBadges(ctx);
+
+    this.updateLabels(now);              // Flaechen-Schwerpunkte periodisch neu berechnen
+    this.drawLabels(ctx);                // Spielernamen auf groesster Flaeche
+
     this.drawMinimap();
   }
 

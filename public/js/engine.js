@@ -9,9 +9,10 @@ export const SPAWN_TURNS = 120;      // 12 Sekunden Startpunkt-Wahl
 
 // Wählbare Kartengrößen
 export const MAP_SIZES = {
-  klein: { w: 320, h: 200, name: 'Klein' },
-  mittel: { w: 480, h: 300, name: 'Mittel' },
-  gross: { w: 640, h: 400, name: 'Groß' },
+  klein: { w: 480, h: 300, name: 'Klein' },
+  mittel: { w: 720, h: 450, name: 'Mittel' },
+  gross: { w: 960, h: 600, name: 'Groß' },
+    riesig: { w: 1920, h: 1200, name: 'Riesig' },
 };
 
 // Wählbare Kartentypen (Preset-Geografie aus worldmap.js)
