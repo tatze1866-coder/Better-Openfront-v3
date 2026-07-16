@@ -366,6 +366,10 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   $('leaderboard').innerHTML = '';
   $('lbTip').classList.add('hidden');
   $('attackList').classList.add('hidden');
+  // Allianz-Anfrage-Karten gehören auch zum alten Spiel -> entfernen
+  for (const card of allyReqCards.values()) card.remove();
+  allyReqCards.clear();
+  $('allyRequests').innerHTML = '';
   updateBuildButtons();
   game = new Game({ seed, players, mapType: mapCfg.mapType, mapSize: mapCfg.mapSize });
   window.__game = game; // Debug-Zugriff (Konsole)
@@ -583,10 +587,16 @@ $('leaderboard').addEventListener('click', e => {
     showToast(`Allianz-Anfrage an ${other.name} gesendet.`);
   }
 });
+
 // ---------- Allianz-Anfragen (Karten mit Annehmen/Ablehnen) ----------
+// Für jede eingehende Anfrage (an mich gerichtet) wird genau einmal eine Karte
+// mit Name/Farbe und zwei Buttons angelegt. Verschwindet die Anfrage aus
+// game.allyRequests (angenommen, abgelaufen o.ä.), wird die Karte automatisch
+// wieder entfernt.
 const allyReqCards = new Map(); // "from:to" -> Karten-Element
 
 function updateAllyRequests() {
+  if (!game) return;
   const activeKeys = new Set();
   for (const key of game.allyRequests) {
     const [from, to] = key.split(':').map(Number);
@@ -645,6 +655,7 @@ function removeAllyCard(key) {
   const card = allyReqCards.get(key);
   if (card) { card.remove(); allyReqCards.delete(key); }
 }
+
 // ---------- HUD ----------
 // Einnahmen aus Handel & Zügen poppen über der Geldanzeige auf: das Neuste
 // steht direkt über dem Geld, Ältere rutschen nach oben (max. 5 gleichzeitig),
@@ -693,11 +704,8 @@ function updateHud(now) {
     phaseEl.textContent = '';
   }
 
-  // Eingehende Allianz-Anfragen melden
- if (me && me.alive) updateAllyRequests();
-      }
-    }
-  }
+  // Eingehende Allianz-Anfragen als Karten mit Annehmen/Ablehnen anzeigen
+  if (me && me.alive) updateAllyRequests();
 
   // Truppenbalken: Fuellstand bis zum Limit, oranges Segment = Truppen im
   // Angriff (zaehlen zur Kapazitaet), Marke beim Wachstums-Maximum
@@ -1237,106 +1245,3 @@ window.addEventListener('resize', () => {
 window.addEventListener('beforeunload', () => {
   if (ws) wsSend({ t: 'leave' });
 });
-// ---------- Allianz-Anfragen (Karten mit Annehmen/Ablehnen) ----------
-const allyReqCards = new Map(); // "from:to" -> Karten-Element
-
-function updateAllyRequests() {
-  const activeKeys = new Set();
-  for (const key of game.allyRequests) {
-    const [from, to] = key.split(':').map(Number);
-    if (to !== myIdx) continue;
-    activeKeys.add(key);
-    if (allyReqCards.has(key)) continue;
-
-    const fromPlayer = game.players[from];
-    if (!fromPlayer) continue;
-
-    const card = document.createElement('div');
-    card.className = 'ally-req-card';
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = fromPlayer.color;
-
-    const text = document.createElement('span');
-    text.className = 'ally-req-text';
-    text.textContent = `${fromPlayer.name} bietet eine Allianz an`;
-
-    const btnRow = document.createElement('div');
-    btnRow.className = 'ally-req-btns';
-
-    const acceptBtn = document.createElement('button');
-    acceptBtn.className = 'ally-accept';
-    acceptBtn.textContent = '🤝 Annehmen';
-    acceptBtn.addEventListener('click', () => {
-      sendIntent({ type: 'ally', target: from });
-      showToast(`Allianz mit ${fromPlayer.name} geschlossen! 🤝`);
-      removeAllyCard(key);
-    });
-
-    const declineBtn = document.createElement('button');
-    declineBtn.className = 'ally-decline';
-    declineBtn.textContent = '✕ Ablehnen';
-    declineBtn.addEventListener('click', () => {
-      sendIntent({ type: 'unally', target: from });
-      showToast(`Allianz-Anfrage von ${fromPlayer.name} abgelehnt.`);
-      removeAllyCard(key);
-    });
-
-    btnRow.append(acceptBtn, declineBtn);
-    card.append(dot, text, btnRow);
-    $('allyRequests').appendChild(card);
-    allyReqCards.set(key, card);
-  }
-
-// ---------- Allianz-Anfragen (Karten mit Annehmen/Ablehnen) ----------
-const allyReqCards = new Map(); // "from:to" -> Karten-Element
-
-function updateAllyRequests() {
-  const activeKeys = new Set();
-  for (const key of game.allyRequests) {
-    const [from, to] = key.split(':').map(Number);
-    if (to !== myIdx) continue;
-    activeKeys.add(key);
-    if (allyReqCards.has(key)) continue;
-
-    const fromPlayer = game.players[from];
-    if (!fromPlayer) continue;
-
-    const card = document.createElement('div');
-    card.className = 'ally-req-card';
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = fromPlayer.color;
-
-    const text = document.createElement('span');
-    text.className = 'ally-req-text';
-    text.textContent = `${fromPlayer.name} bietet eine Allianz an`;
-
-    const btnRow = document.createElement('div');
-    btnRow.className = 'ally-req-btns';
-
-    const acceptBtn = document.createElement('button');
-    acceptBtn.className = 'ally-accept';
-    acceptBtn.textContent = '🤝 Annehmen';
-    acceptBtn.addEventListener('click', () => {
-      sendIntent({ type: 'ally', target: from });
-      showToast(`Allianz mit ${fromPlayer.name} geschlossen! 🤝`);
-      removeAllyCard(key);
-    });
-
-    const declineBtn = document.createElement('button');
-    declineBtn.className = 'ally-decline';
-    declineBtn.textContent = '✕ Ablehnen';
-    declineBtn.addEventListener('click', () => {
-      sendIntent({ type: 'unally', target: from });
-      showToast(`Allianz-Anfrage von ${fromPlayer.name} abgelehnt.`);
-      removeAllyCard(key);
-    });
-
-    btnRow.append(acceptBtn, declineBtn);
-    card.append(dot, text, btnRow);
-    $('allyRequests').appendChild(card);
-    allyReqCards.set(key, card);
-  }
