@@ -799,3 +799,41 @@ button.primary:hover { background: #f4845f; }
 .lobby-panel #lobbyLevelSeg button.sel {
   box-shadow: 0 0 0 2px #f0d68a inset, 0 0 10px rgba(240, 214, 138, 0.5);
 }
+#allyRequests {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 12;
+  pointer-events: none; /* Container selbst klickt nicht, Karten schon */
+}
+.ally-req-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(22, 40, 60, 0.97);
+  border: 1px solid #f4a261;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: allyPop 0.2s ease-out;
+}
+.ally-req-card .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.ally-req-text { flex: 1; white-space: nowrap; }
+.ally-req-btns { display: flex; gap: 6px; }
+.ally-req-btns button {
+  width: auto; margin: 0; padding: 6px 10px; font-size: 13px;
+}
+.ally-req-btns .ally-accept { background: #2a9d8f; }
+.ally-req-btns .ally-accept:hover { background: #36bfae; }
+.ally-req-btns .ally-decline { background: #6b3a3a; }
+.ally-req-btns .ally-decline:hover { background: #8a4a4a; }
+@keyframes allyPop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
