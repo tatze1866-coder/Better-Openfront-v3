@@ -3,6 +3,7 @@
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
 import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
 import { Renderer } from './renderer.js';
+import { getLang, setLang, applyStaticTranslations, onLangChange, t } from './i18n.js';
 
 const $ = id => document.getElementById(id);
 
@@ -11,6 +12,171 @@ const screens = { menu: $('menu'), lobby: $('lobby'), game: $('game') };
 // Genau einen Screen sichtbar schalten (per CSS-Klasse 'active').
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle('active', k === name);
+}
+
+// ---------- Einstellungen (Settings-Modal) ----------
+// Einstellungen aus localStorage laden (mit Fallback-Defaults)
+const settings = {
+  lang: getLang(),
+  volume: parseInt(localStorage.getItem('ofVolume') ?? '80', 10),
+  animations: localStorage.getItem('ofAnimations') ?? 'on',
+  fps: localStorage.getItem('ofFps') ?? 'off',
+};
+
+// Einstellungen beim Start anwenden
+applyStaticTranslations();
+
+// Sprachsegment aktualisieren
+function updateLangSeg() {
+  const cur = getLang();
+  for (const btn of $('langSeg').querySelectorAll('button[data-lang]')) {
+    btn.classList.toggle('sel', btn.dataset.lang === cur);
+  }
+}
+
+// Animations-Segment aktualisieren
+function updateAnimSeg() {
+  for (const btn of $('animSeg').querySelectorAll('button[data-anim]')) {
+    btn.classList.toggle('sel', btn.dataset.anim === settings.animations);
+  }
+}
+
+// FPS-Segment aktualisieren
+function updateFpsSeg() {
+  for (const btn of $('fpsSeg').querySelectorAll('button[data-fps]')) {
+    btn.classList.toggle('sel', btn.dataset.fps === settings.fps);
+  }
+  const fpsEl = $('fpsDisplay');
+  if (fpsEl) fpsEl.classList.toggle('hidden', settings.fps !== 'on');
+}
+
+// Lautstärke-Anzeige aktualisieren
+function updateVolumeDisplay() {
+  $('volumeSlider').value = settings.volume;
+  $('volumeLabel').textContent = settings.volume + '%';
+}
+
+// Settings-Dialog öffnen
+function openSettings() {
+  updateLangSeg();
+  updateAnimSeg();
+  updateFpsSeg();
+  updateVolumeDisplay();
+  $('settingsOverlay').classList.remove('hidden');
+}
+
+// Settings-Dialog schließen
+function closeSettings() {
+  $('settingsOverlay').classList.add('hidden');
+}
+
+// Settings-Button: Zahnrad-Icon
+$('btnSettings').addEventListener('click', openSettings);
+$('btnSettingsClose').addEventListener('click', closeSettings);
+$('btnSettingsCloseBottom').addEventListener('click', closeSettings);
+
+// Overlay-Hintergrund schließt den Dialog
+$('settingsOverlay').addEventListener('click', e => {
+  if (e.target === $('settingsOverlay')) closeSettings();
+});
+
+// Escape-Taste schließt den Dialog
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('settingsOverlay').classList.contains('hidden')) {
+    closeSettings();
+  }
+});
+
+// Sprachauswahl
+$('langSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-lang]');
+  if (!btn) return;
+  setLang(btn.dataset.lang);
+  settings.lang = btn.dataset.lang;
+  updateLangSeg();
+  // Dynamische Texte (Bau-Buttons, Dropdowns) neu aufbauen
+  rebuildDynamicTexts();
+});
+
+// Lautstärke
+$('volumeSlider').addEventListener('input', e => {
+  settings.volume = +e.target.value;
+  $('volumeLabel').textContent = settings.volume + '%';
+  localStorage.setItem('ofVolume', settings.volume);
+});
+
+// Animationen
+$('animSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-anim]');
+  if (!btn) return;
+  settings.animations = btn.dataset.anim;
+  localStorage.setItem('ofAnimations', settings.animations);
+  updateAnimSeg();
+});
+
+// FPS-Anzeige
+$('fpsSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-fps]');
+  if (!btn) return;
+  settings.fps = btn.dataset.fps;
+  localStorage.setItem('ofFps', settings.fps);
+  updateFpsSeg();
+});
+
+// Wenn Sprache wechselt: statische Übersetzungen neu anwenden
+onLangChange(() => {
+  applyStaticTranslations();
+  updateLangSeg();
+});
+
+// Dynamische Texte (Bau-Buttons etc.) neu aufbauen nach Sprachwechsel
+function rebuildDynamicTexts() {
+  // Bau-Button-Labels werden in updateBuildPrices() / startGame() gesetzt;
+  // hier nur die Dropdown-Optionen für Karten neu befüllen
+  for (const selId of ['soloMap', 'lobbyMap']) {
+    const sel = $(selId);
+    const cur = sel.value;
+    sel.innerHTML = '';
+    for (const tp of MAP_TYPES) {
+      const o = document.createElement('option');
+      o.value = tp.id;
+      o.textContent = tp.name;
+      sel.appendChild(o);
+    }
+    sel.value = cur;
+  }
+  for (const selId of ['soloSize', 'lobbySize']) {
+    const sel = $(selId);
+    const cur = sel.value;
+    sel.innerHTML = '';
+    for (const [id, s] of Object.entries(MAP_SIZES)) {
+      const o = document.createElement('option');
+      o.value = id;
+      o.textContent = `${s.name} (${s.w}×${s.h})`;
+      sel.appendChild(o);
+    }
+    sel.value = cur || 'mittel';
+  }
+}
+
+// FPS-Anzeige-Element ins Spiel-Screen einfügen (einmalig)
+const fpsDisplayEl = document.createElement('div');
+fpsDisplayEl.id = 'fpsDisplay';
+fpsDisplayEl.className = 'hidden';
+$('game').appendChild(fpsDisplayEl);
+updateFpsSeg();
+
+// FPS messen und anzeigen
+let fpsPrev = 0, fpsCount = 0, fpsAvg = 0;
+function trackFps(now) {
+  fpsCount++;
+  if (now - fpsPrev >= 1000) {
+    fpsAvg = fpsCount;
+    fpsCount = 0;
+    fpsPrev = now;
+    const el = $('fpsDisplay');
+    if (el && settings.fps === 'on') el.textContent = fpsAvg + ' FPS';
+  }
 }
 
 // ---------- Zustand ----------
@@ -999,6 +1165,7 @@ function frame(now) {
   updateCamera(now);
   renderer.draw();
   updateHud(now);
+  trackFps(now);
   requestAnimationFrame(frame);
 }
 
