@@ -636,6 +636,7 @@ function updateLbTip() {
     tip.appendChild(d);
   };
   line('Truppen: ', `${fmt(p.troops)} / ${fmt(game.maxTroopsOf(p))}`);
+  line('Geld: ', `${fmt(p.money)} €`);
   line('Gebiet: ', `${(p.territory / game.map.landCount * 100).toFixed(1)}%`);
 
   const builds = document.createElement('div');
