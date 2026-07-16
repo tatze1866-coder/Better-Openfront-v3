@@ -1228,6 +1228,58 @@ function updateAllyRequests() {
     allyReqCards.set(key, card);
   }
 
+// ---------- Allianz-Anfragen (Karten mit Annehmen/Ablehnen) ----------
+const allyReqCards = new Map(); // "from:to" -> Karten-Element
+
+function updateAllyRequests() {
+  const activeKeys = new Set();
+  for (const key of game.allyRequests) {
+    const [from, to] = key.split(':').map(Number);
+    if (to !== myIdx) continue;
+    activeKeys.add(key);
+    if (allyReqCards.has(key)) continue;
+
+    const fromPlayer = game.players[from];
+    if (!fromPlayer) continue;
+
+    const card = document.createElement('div');
+    card.className = 'ally-req-card';
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = fromPlayer.color;
+
+    const text = document.createElement('span');
+    text.className = 'ally-req-text';
+    text.textContent = `${fromPlayer.name} bietet eine Allianz an`;
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'ally-req-btns';
+
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'ally-accept';
+    acceptBtn.textContent = '🤝 Annehmen';
+    acceptBtn.addEventListener('click', () => {
+      sendIntent({ type: 'ally', target: from });
+      showToast(`Allianz mit ${fromPlayer.name} geschlossen! 🤝`);
+      removeAllyCard(key);
+    });
+
+    const declineBtn = document.createElement('button');
+    declineBtn.className = 'ally-decline';
+    declineBtn.textContent = '✕ Ablehnen';
+    declineBtn.addEventListener('click', () => {
+      sendIntent({ type: 'unally', target: from });
+      showToast(`Allianz-Anfrage von ${fromPlayer.name} abgelehnt.`);
+      removeAllyCard(key);
+    });
+
+    btnRow.append(acceptBtn, declineBtn);
+    card.append(dot, text, btnRow);
+    $('allyRequests').appendChild(card);
+    allyReqCards.set(key, card);
+  }
+
   // Karten entfernen, deren Anfrage nicht mehr existiert (angenommen/abgelaufen)
   for (const [key, card] of allyReqCards) {
     if (!activeKeys.has(key)) { card.remove(); allyReqCards.delete(key); }
