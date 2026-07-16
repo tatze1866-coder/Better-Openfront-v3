@@ -29,7 +29,7 @@ export const MAP_TYPES = [
 // Wirtschaft (pro Tick)
 // Truppenwachstum folgt einer Kurve: Maximum bei 40% des Truppenlimits,
 // darunter ansteigend, darüber abfallend (0 bei vollem Limit).
-const GROWTH_PEAK = 0.4;
+export const GROWTH_PEAK = 0.4;      // Maximum der Wachstumskurve (40% des Limits)
 const MAX_PER_TERRITORY = 120;
 const MAX_BASE = 800;
 const START_TROOPS = 512;
@@ -80,13 +80,16 @@ const REPAIR_DIST2 = 9;              // Reparatur nahe eigenem Hafen
 const REPAIR_INTERVAL = 20;          // 1 Schaden je 2s
 
 // Fabriken & Züge
-const FACTORY_RADIUS2 = 900;         // Schienennetz im Radius 30
+export const FACTORY_RADIUS = 60;    // Schienennetz-Radius einer Fabrik in Zellen
+const FACTORY_RADIUS2 = FACTORY_RADIUS * FACTORY_RADIUS;
 const TRAIN_INTERVAL = 50;           // alle 5s Chance auf einen Zug
 const TRAIN_CHANCE = 0.4;
 const TRAIN_CAP = 3;                 // Züge gleichzeitig je Fabrik
 const TRAIN_SPEED = 1.4;             // Zellen pro Tick entlang der Schiene
 const TRAIN_VISITS = 6;              // Stationsbesuche, dann endet der Zug
-const TRAIN_PAY = { own: 6, enemy: 12, ally: 18 }; // aufsteigend: eigene < fremde < verbündete
+// Geld je durchfahrener Station. Bei FREMDEN Stationen verdienen beide Seiten
+// (der Zug-Besitzer und der Stationsbesitzer) – Verbündete bringen am meisten.
+const TRAIN_PAY = { own: 6, foreign: 12, ally: 18 };
 
 // Boote
 export const MAX_BOATS = 3;
@@ -127,6 +130,9 @@ export class Game {
     this.tradeShips = [];          // Handelsschiffe zwischen Häfen
     this.warships = [];            // Kriegsschiffe
     this.trains = [];              // Züge auf Schienennetzen
+    // Schienennetz-Graph, jede Runde neu berechnet (siehe buildRailNetwork):
+    // adj = Zelle -> Nachbarknoten, edges = Kantenliste fürs Zeichnen
+    this.rails = { adj: new Map(), edges: [] };
     this.buildings = [];           // Städte, Festungen, Häfen, Fabriken
     this.buildingAt = new Map();   // Zelle -> Gebäude
     this.alliances = new Set();    // "a:b" (a < b)
@@ -743,65 +749,116 @@ export class Game {
       (b.kind === 'city' || b.kind === 'port') && this.dist2(b.cell, factory.cell) <= FACTORY_RADIUS2);
   }
 
-  // Interpolierte Zugposition zwischen Fabrik und Station (fuer den Renderer).
-  trainPos(tr) {
-    // Position auf der Schiene (für Renderer): Fabrik <-> Station
-    const w = this.map.w;
-    const fx = tr.factory % w, fy = (tr.factory / w) | 0;
-    const sx = tr.station % w, sy = (tr.station / w) | 0;
-    const t = tr.out ? tr.t : 1 - tr.t;
-    return [fx + (sx - fx) * t, fy + (sy - fy) * t];
+  // Schienennetz-Graph neu aufbauen (einmal pro Runde, siehe turn()).
+  // Knoten sind Fabriken und Stationen (Städte/Häfen). Kanten entstehen
+  //  - zwischen einer Fabrik und jeder Station in ihrem Radius,
+  //  - zwischen zwei Stationen, die im Radius DERSELBEN Fabrik liegen (Stadt–Stadt).
+  // Zwei Fabrik-Netze verschmelzen dadurch automatisch, sobald eine Station in
+  // den Radius beider Fabriken faellt: sie ist dann Knoten in beiden Netzen und
+  // haengt die Komponenten zusammen.
+  buildRailNetwork() {
+    const adj = new Map();
+    const edges = [];
+    // Ungerichtete Kante eintragen (Doppelte werden uebersprungen)
+    const link = (a, b) => {
+      if (a === b) return;
+      let na = adj.get(a);
+      if (!na) { na = []; adj.set(a, na); }
+      if (na.includes(b)) return;
+      na.push(b);
+      let nb = adj.get(b);
+      if (!nb) { nb = []; adj.set(b, nb); }
+      nb.push(a);
+      edges.push([a, b]);
+    };
+    for (const f of this.buildings) {
+      if (f.kind !== 'factory') continue;
+      const stations = this.factoryStations(f);
+      for (let i = 0; i < stations.length; i++) {
+        link(f.cell, stations[i].cell);                 // Fabrik <-> Station
+        for (let j = i + 1; j < stations.length; j++) {
+          link(stations[i].cell, stations[j].cell);     // Stadt <-> Stadt
+        }
+      }
+    }
+    this.rails = { adj, edges };
   }
 
-  // Zuege pro Tick: Fabriken erzeugen mit Wahrscheinlichkeit neue Zuege, die
-  // zwischen Fabrik und Station pendeln und bei jedem Stationsbesuch Geld bringen
-  // (verbuendete Stationen zahlen am meisten). Nach TRAIN_VISITS endet der Zug.
+  // Interpolierte Zugposition zwischen zwei Netzknoten (fuer den Renderer).
+  trainPos(tr) {
+    const w = this.map.w;
+    const fx = tr.from % w, fy = (tr.from / w) | 0;
+    const tx = tr.to % w, ty = (tr.to / w) | 0;
+    return [fx + (tx - fx) * tr.t, fy + (ty - fy) * tr.t];
+  }
+
+  // Naechsten Knoten fuer einen Zug waehlen: moeglichst nicht dorthin zurueck,
+  // woher er gerade kam (prev). Nur in einer Sackgasse bleibt der Rueckweg.
+  nextRailNode(node, prev) {
+    const nb = this.rails.adj.get(node);
+    if (!nb || !nb.length) return -1;
+    const fwd = nb.filter(c => c !== prev);
+    const pool = fwd.length ? fwd : nb;
+    return pool[(this.rng() * pool.length) | 0];
+  }
+
+  // Geld fuer eine durchfahrene Station. Eigene Station: nur der Zug-Besitzer.
+  // Fremde Station: BEIDE Seiten verdienen (verbuendet bringt am meisten).
+  payTrain(tr, st) {
+    const me = this.players[tr.owner];
+    if (st.owner === tr.owner) { me.money += TRAIN_PAY.own; return; }
+    const pay = this.isAllied(st.owner, tr.owner) ? TRAIN_PAY.ally : TRAIN_PAY.foreign;
+    me.money += pay;
+    const other = this.players[st.owner];
+    if (other && other.alive) other.money += pay;
+  }
+
+  // Zuege pro Tick: Fabriken erzeugen mit Wahrscheinlichkeit neue Zuege, die das
+  // Schienennetz abfahren. Bei jeder erreichten Station gibt es Geld (payTrain).
+  // Nach TRAIN_VISITS besuchten Stationen endet der Zug.
   processTrains() {
-    // Chance auf neue Züge je Fabrik
+    // Chance auf neue Züge je Fabrik (nur wenn die Fabrik Anschluss ans Netz hat)
     for (const b of this.buildings) {
       if (b.kind !== 'factory' || !this.players[b.owner].alive) continue;
       if ((this.turnNo + b.cell) % TRAIN_INTERVAL !== 0) continue;
       if (this.trains.filter(t => t.factory === b.cell).length >= TRAIN_CAP) continue;
-      const stations = this.factoryStations(b);
-      if (!stations.length) continue;
+      const nb = this.rails.adj.get(b.cell);
+      if (!nb || !nb.length) continue;
       if (this.rng() < TRAIN_CHANCE) {
         this.trains.push({
           owner: b.owner,
           factory: b.cell,
-          station: stations[(this.rng() * stations.length) | 0].cell,
+          from: b.cell,
+          to: nb[(this.rng() * nb.length) | 0],
           t: 0,
-          out: true,
           visits: 0,
         });
       }
     }
-    // Fahren, Stationen berühren, Geld einsammeln
+    // Fahren, Stationen erreichen, Geld einsammeln, weiterfahren
     for (const tr of this.trains) {
       if (!this.players[tr.owner].alive) { tr.dead = true; continue; }
       const fac = this.buildingAt.get(tr.factory);
       if (!fac || fac.kind !== 'factory') { tr.dead = true; continue; }
-      const len = Math.max(1, Math.sqrt(this.dist2(tr.factory, tr.station)));
+      const len = Math.max(1, Math.sqrt(this.dist2(tr.from, tr.to)));
       tr.t += TRAIN_SPEED / len;
       if (tr.t < 1) continue;
+
+      // Knoten erreicht
+      const prev = tr.from;
+      const arrived = tr.to;
       tr.t = 0;
-      if (tr.out) {
-        // Station erreicht: Geld – eigene < fremde < verbündete
-        const st = this.buildingAt.get(tr.station);
-        if (st) {
-          const pay = st.owner === tr.owner ? TRAIN_PAY.own
-            : this.isAllied(st.owner, tr.owner) ? TRAIN_PAY.ally
-            : TRAIN_PAY.enemy;
-          this.players[tr.owner].money += pay;
-        }
-        tr.out = false;
-      } else {
+      tr.from = arrived;
+      const st = this.buildingAt.get(arrived);
+      if (st && (st.kind === 'city' || st.kind === 'port')) {
+        this.payTrain(tr, st);
         tr.visits++;
         if (tr.visits >= TRAIN_VISITS) { tr.dead = true; continue; }
-        const stations = this.factoryStations(fac);
-        if (!stations.length) { tr.dead = true; continue; }
-        tr.station = stations[(this.rng() * stations.length) | 0].cell;
-        tr.out = true;
       }
+      // Weiter ins Netz; kein Anschluss mehr (Gebäude zerstört) -> Zug endet
+      const next = this.nextRailNode(arrived, prev);
+      if (next < 0) { tr.dead = true; continue; }
+      tr.to = next;
     }
     this.trains = this.trains.filter(t => !t.dead);
   }
@@ -825,6 +882,7 @@ export class Game {
     this.processBoats();
     this.processTrade();
     this.processWarships();
+    this.buildRailNetwork();   // Netz zuerst, damit Züge das aktuelle Netz nutzen
     this.processTrains();
     this.processAttacks();
     if (this.turnNo % 10 === 0) this.checkWin();

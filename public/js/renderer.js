@@ -6,6 +6,8 @@
 // EIN Bild hochskaliert. So muss pro Frame nicht jede Zelle einzeln gezeichnet
 // werden; geaendert wird nur, was sich wirklich veraendert hat (markDirty).
 
+import { FACTORY_RADIUS } from './engine.js';
+
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
 const WATER = [45, 90, 140];
 const NEUTRAL = [181, 173, 138];
@@ -33,6 +35,10 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.game = game;
+    // Von main.js gesetzt: eigener Spieler-Index (fuer den Fabrik-Radius) und
+    // ob gerade der Fabrik-Baumodus laeuft (dann Radius deutlicher zeichnen).
+    this.myIdx = -1;
+    this.factoryHint = false;
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -240,55 +246,91 @@ export class Renderer {
     const w = g.map.w;
     const cx = c => c % w + 0.5, cy = c => ((c / w) | 0) + 0.5;
 
-    // Schienennetz zuerst (unter allem): Fabrik -> Stationen im Radius
-    ctx.strokeStyle = 'rgba(40, 32, 24, 0.6)';
-    ctx.lineWidth = 0.5;
-    for (const b of g.buildings) {
-      if (b.kind !== 'factory') continue;
-      for (const st of g.factoryStations(b)) {
-        ctx.beginPath();
-        ctx.moveTo(cx(b.cell), cy(b.cell));
-        ctx.lineTo(cx(st.cell), cy(st.cell));
-        ctx.stroke();
+    // Schienennetz zuerst (unter allem): alle Kanten aus dem Engine-Graph –
+    // Fabrik–Station UND Stadt–Stadt (siehe buildRailNetwork). Alles in einem
+    // Pfad, das ist deutlich schneller als ein Pfad je Kante.
+    if (g.rails && g.rails.edges.length) {
+      ctx.strokeStyle = 'rgba(40, 32, 24, 0.6)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (const [a, b] of g.rails.edges) {
+        ctx.moveTo(cx(a), cy(a));
+        ctx.lineTo(cx(b), cy(b));
       }
+      ctx.stroke();
     }
 
-    // Gebaeude: jeweils weisser Rahmen + Fuellung in Spielerfarbe, je nach Typ
-    // ein anderes Symbol (Quadrat = Stadt, Kreis = Festung, Raute = Hafen …).
+    // Radius der EIGENEN Fabriken andeuten – zeigt, welche Städte/Häfen ans
+    // Netz angeschlossen werden. Im Fabrik-Baumodus deutlicher (Platzierhilfe).
+    if (this.myIdx >= 0) {
+      const strong = this.factoryHint;
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = strong ? 0.9 : 0.4;
+      ctx.strokeStyle = strong ? 'rgba(244, 162, 97, 0.85)' : 'rgba(244, 162, 97, 0.28)';
+      for (const b of g.buildings) {
+        if (b.kind !== 'factory' || b.owner !== this.myIdx) continue;
+        ctx.beginPath();
+        ctx.arc(cx(b.cell), cy(b.cell), FACTORY_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Gebaeude-Icons: erst eine weisse Silhouette als Kontrast zum Untergrund,
+    // darin dasselbe Motiv kleiner in Spielerfarbe. Die Silhouetten sind bewusst
+    // gut unterscheidbar (Haeuserzeile / Turm / Anker / Halle mit Schornstein),
+    // denn bei kleinem Zoom sind das nur wenige Pixel.
     for (const b of g.buildings) {
       const x = cx(b.cell), y = cy(b.cell);
       const col = b.owner >= 0 ? g.players[b.owner].color : '#888';
       if (b.kind === 'city') {
+        // Haeuserzeile: drei unterschiedlich hohe Haeuser
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - 2, y - 2, 4, 4);
+        ctx.fillRect(x - 2.9, y - 1, 2, 3.6);
+        ctx.fillRect(x - 1.1, y - 2.7, 2.2, 5.3);
+        ctx.fillRect(x + 0.9, y - 1.7, 2, 4.3);
         ctx.fillStyle = col;
-        ctx.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
+        ctx.fillRect(x - 2.45, y - 0.5, 1.1, 2.6);
+        ctx.fillRect(x - 0.65, y - 2.2, 1.3, 4.3);
+        ctx.fillRect(x + 1.35, y - 1.2, 1.1, 3.3);
       } else if (b.kind === 'fort') {
+        // Turm mit Zinnen
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.arc(x, y, 2.9, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.arc(x, y, 1.3, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(x - 1.6, y - 1.1, 3.2, 3.1);      // Turmkoerper
+        ctx.fillRect(x - 1.6, y - 2, 0.9, 1);          // Zinne links
+        ctx.fillRect(x - 0.45, y - 2, 0.9, 1);         // Zinne mitte
+        ctx.fillRect(x + 0.7, y - 2, 0.9, 1);          // Zinne rechts
       } else if (b.kind === 'port') {
-        // Raute (Anker-Symbolik)
+        // Anker auf einer Raute
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(x, y - 2.6); ctx.lineTo(x + 2.6, y); ctx.lineTo(x, y + 2.6); ctx.lineTo(x - 2.6, y);
+        ctx.moveTo(x, y - 3); ctx.lineTo(x + 3, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 3, y);
         ctx.closePath(); ctx.fill();
         ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.moveTo(x, y - 1.5); ctx.lineTo(x + 1.5, y); ctx.lineTo(x, y + 1.5); ctx.lineTo(x - 1.5, y);
-        ctx.closePath(); ctx.fill();
+        ctx.beginPath();                                // Ring oben
+        ctx.arc(x, y - 1.5, 0.75, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(x - 0.35, y - 1.2, 0.7, 3);        // Schaft
+        ctx.fillRect(x - 1.4, y - 0.6, 2.8, 0.6);       // Querbalken
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();                                // Flunken (Bogen unten)
+        ctx.moveTo(x - 1.7, y + 0.9);
+        ctx.quadraticCurveTo(x, y + 3.1, x + 1.7, y + 0.9);
+        ctx.stroke();
       } else if (b.kind === 'factory') {
-        // Fabrik: Quadrat mit Schornstein
+        // Halle mit Schornstein (Schornstein ragt heraus -> klare Silhouette)
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - 2.2, y - 1.6, 4.4, 3.4);
-        ctx.fillRect(x + 0.6, y - 3, 1.2, 2);
+        ctx.fillRect(x - 2.7, y - 1.7, 5.4, 4.3);
+        ctx.fillRect(x + 0.7, y - 3.4, 1.8, 2);
         ctx.fillStyle = col;
-        ctx.fillRect(x - 1.4, y - 0.8, 2.8, 1.9);
+        ctx.fillRect(x - 2.1, y - 1.1, 4.2, 3.1);       // Halle
+        ctx.fillRect(x + 1.05, y - 3, 1.1, 1.9);        // Schornstein
       }
     }
 

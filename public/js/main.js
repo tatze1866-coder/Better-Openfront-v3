@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, MAP_SIZES, MAP_TYPES } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
 import { Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
@@ -275,11 +275,19 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   keysDown.clear();
   hideCtxMenu();
   lastCam = 0;
+  // Rangliste gehört zum alten Spiel -> Zeilen/Hover/Tooltip zurücksetzen
+  lbRows.clear();
+  lbOrder = '';
+  lbHoverIdx = -1;
+  $('leaderboard').innerHTML = '';
+  $('lbTip').classList.add('hidden');
+  $('attackList').classList.add('hidden');
   updateBuildButtons();
   game = new Game({ seed, players, mapType: mapCfg.mapType, mapSize: mapCfg.mapSize });
   window.__game = game; // Debug-Zugriff (Konsole)
   const canvas = $('canvas');
   renderer = new Renderer(canvas, game);
+  renderer.myIdx = myIdx;              // fuer den Fabrik-Radius der eigenen Fabriken
   window.__renderer = renderer;
   $('overlay').classList.add('hidden');
   showScreen('game');
@@ -407,6 +415,8 @@ function updateBuildButtons() {
     $(bk.btn).classList.toggle('build-active', buildMode === bk.kind);
   }
   $('canvas').style.cursor = buildMode ? 'copy' : 'crosshair';
+  // Im Fabrik-Baumodus den Radius der eigenen Fabriken deutlich hervorheben
+  if (renderer) renderer.factoryHint = buildMode === 'factory';
 }
 for (const bk of BUILD_KINDS) {
   $(bk.btn).textContent = `${bk.label} (${BUILD_COSTS[bk.kind]}€)`;
@@ -529,29 +539,176 @@ function updateHud(now) {
     }
   }
 
+  // Truppenbalken: Fuellstand bis zum Limit, Marke beim Wachstums-Maximum
+  const fill = $('troopFill');
+  fill.style.width = me ? Math.max(0, Math.min(100, (me.troops / game.maxTroopsOf(me)) * 100)) + '%' : '0%';
+  $('troopPeak').style.left = (GROWTH_PEAK * 100) + '%';
+
+  updateLeaderboard();
+  updateLbTip();
+  updateAttackList();
+}
+
+// ---------- Rangliste ----------
+// Die Zeilen werden EINMAL angelegt und danach nur noch aktualisiert (kein
+// innerHTML-Neubau): sonst würde der Hover-Tooltip alle 250ms wegflackern.
+const lbRows = new Map();   // Spieler-Index -> Zeilen-Element
+let lbOrder = '';           // zuletzt gerenderte Reihenfolge (Sortier-Sparfuchs)
+let lbHoverIdx = -1;        // Spieler, über dem gerade die Maus steht
+
+function lbRowFor(p) {
+  let r = lbRows.get(p.idx);
+  if (r) return r;
+  r = document.createElement('div');
+  r.className = 'lb-row';
+  r.dataset.idx = p.idx;
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.style.background = p.color;
+  const name = document.createElement('span');
+  name.className = 'lb-name';
+  const val = document.createElement('span');
+  val.className = 'lb-val';
+  r.append(dot, name, val);
+  r._name = name;
+  r._val = val;
+  lbRows.set(p.idx, r);
+  return r;
+}
+
+function updateLeaderboard() {
   const lb = $('leaderboard');
   const sorted = [...game.players].sort((a, b) => b.territory - a.territory);
-  lb.innerHTML = '';
   for (const p of sorted) {
-    const row = document.createElement('div');
-    row.className = 'lb-row' + (p.alive ? '' : ' dead');
-    row.dataset.idx = p.idx;
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = p.color;
-    const name = document.createElement('span');
-    name.className = 'lb-name';
+    const r = lbRowFor(p);
+    r.classList.toggle('dead', !p.alive);
     let suffix = p.idx === myIdx ? ' (Du)' : '';
     if (p.idx !== myIdx && game.isAllied(myIdx, p.idx)) suffix = ' 🤝';
     else if (p.idx !== myIdx && game.allyRequests.has(`${p.idx}:${myIdx}`)) suffix = ' 🤝?';
     else if (p.idx !== myIdx && game.allyRequests.has(`${myIdx}:${p.idx}`)) suffix = ' ⏳';
-    name.textContent = p.name + suffix;
-    const val = document.createElement('span');
-    val.className = 'lb-val';
-    val.textContent = `${(p.territory / game.map.landCount * 100).toFixed(1)}% · ${fmt(p.troops)}`;
-    row.append(dot, name, val);
-    lb.appendChild(row);
+    r._name.textContent = p.name + suffix;
+    r._val.textContent = `${(p.territory / game.map.landCount * 100).toFixed(1)}% · ${fmt(p.troops)}`;
   }
+  // Nur umsortieren, wenn sich die Reihenfolge wirklich geändert hat
+  const order = sorted.map(p => p.idx).join(',');
+  if (order !== lbOrder) {
+    lbOrder = order;
+    for (const p of sorted) lb.appendChild(lbRowFor(p)); // appendChild verschiebt
+  }
+}
+
+// Maus über einer Zeile -> Spieler merken (Delegation, da Zeilen bestehen bleiben)
+$('leaderboard').addEventListener('mouseover', e => {
+  const row = e.target.closest('.lb-row');
+  lbHoverIdx = row && row.dataset.idx !== undefined ? +row.dataset.idx : -1;
+});
+$('leaderboard').addEventListener('mouseleave', () => {
+  lbHoverIdx = -1;
+  $('lbTip').classList.add('hidden');
+});
+
+// Details zum gehoverten Spieler: Name, Truppen, Gebiet und Gebäude je Typ.
+// Wird im HUD-Takt aktualisiert, damit die Werte live mitlaufen.
+function updateLbTip() {
+  const tip = $('lbTip');
+  const p = lbHoverIdx >= 0 ? game.players[lbHoverIdx] : null;
+  const row = p ? lbRows.get(p.idx) : null;
+  if (!p || !row) { tip.classList.add('hidden'); return; }
+
+  tip.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'tip-name';
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.style.background = p.color;
+  const nm = document.createElement('span');
+  nm.textContent = p.name + (p.idx === myIdx ? ' (Du)' : '');
+  head.append(dot, nm);
+  tip.appendChild(head);
+
+  const line = (label, value) => {
+    const d = document.createElement('div');
+    d.className = 'tip-line';
+    d.textContent = label;
+    const b = document.createElement('b');
+    b.textContent = value;
+    d.appendChild(b);
+    tip.appendChild(d);
+  };
+  line('Truppen: ', `${fmt(p.troops)} / ${fmt(game.maxTroopsOf(p))}`);
+  line('Gebiet: ', `${(p.territory / game.map.landCount * 100).toFixed(1)}%`);
+
+  const builds = document.createElement('div');
+  builds.className = 'tip-builds';
+  for (const [ico, n] of [['🏙', p.cities], ['🛡', p.forts], ['⚓', p.ports], ['🏭', p.factories]]) {
+    const s = document.createElement('span');
+    s.textContent = ico + ' ';
+    const b = document.createElement('b');
+    b.textContent = n;
+    s.appendChild(b);
+    builds.appendChild(s);
+  }
+  tip.appendChild(builds);
+
+  if (!p.alive) {
+    const d = document.createElement('div');
+    d.className = 'tip-dead';
+    d.textContent = 'Eliminiert 💀';
+    tip.appendChild(d);
+  }
+
+  // Links neben der Rangliste, auf Höhe der Zeile (im Fenster halten)
+  tip.classList.remove('hidden');
+  const r = row.getBoundingClientRect();
+  tip.style.left = 'auto';
+  tip.style.right = (window.innerWidth - r.left + 10) + 'px';
+  tip.style.top = Math.max(4, Math.min(r.top - 6, window.innerHeight - tip.offsetHeight - 6)) + 'px';
+}
+
+// ---------- Laufende Angriffe ----------
+// Zeigt, welche Angriffe von dir unterwegs sind und wer dich gerade angreift.
+function updateAttackList() {
+  const el = $('attackList');
+  const out = [], inc = [];
+  for (const a of game.attacks) {
+    if (a.pool <= 0) continue;
+    if (a.attacker === myIdx) out.push(a);
+    else if (a.target === myIdx) inc.push(a);
+  }
+  if (!out.length && !inc.length) { el.classList.add('hidden'); return; }
+
+  el.innerHTML = '';
+  const section = (title, list, cls, ico, otherOf) => {
+    if (!list.length) return;
+    const h = document.createElement('div');
+    h.className = 'atk-head';
+    h.textContent = title;
+    el.appendChild(h);
+    for (const a of list) {
+      const other = otherOf(a);
+      const row = document.createElement('div');
+      row.className = 'atk-row ' + cls;
+      const i = document.createElement('span');
+      i.className = 'atk-ico';
+      i.textContent = ico;
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = other.color;
+      const nm = document.createElement('span');
+      nm.className = 'atk-name';
+      nm.textContent = other.name;
+      const n = document.createElement('span');
+      n.className = 'atk-n';
+      n.textContent = fmt(a.pool);
+      row.append(i, dot, nm, n);
+      el.appendChild(row);
+    }
+  };
+  // Ziel -1 = neutrales Land (kein Spieler)
+  section('Deine Angriffe', out, 'atk-out', '⚔',
+    a => (a.target < 0 ? { name: 'Neutral', color: '#b5ad8a' } : game.players[a.target]));
+  section('Gegen dich', inc, 'atk-in', '🛡', a => game.players[a.attacker]);
+  el.classList.remove('hidden');
 }
 
 // ---------- Kamera per Tastatur (WASD / Pfeile) ----------

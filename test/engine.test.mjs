@@ -428,6 +428,69 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     `abgezogen: ${Math.floor(mBefore - p.money)} €`);
 }
 
+// ---- Spiel 12: Schienennetz (Stadt–Stadt, Verschmelzung) & Zug-Bezahlung ----
+{
+  const gr = new Game({
+    seed: 99, mapSize: 'klein', mapType: 'random',
+    players: [{ name: 'A', bot: false }, { name: 'B', bot: false }],
+  });
+  while (gr.phase === 'spawn') gr.turn([]);
+  const W = gr.map.w;
+  const at = (x, y) => y * W + x;
+  // Gebäude direkt setzen (umgeht Baukosten/Gelände – fürs Netz zählt nur die Lage)
+  const put = (owner, kind, cell) => {
+    const b = { owner, kind, cell };
+    gr.buildings.push(b);
+    gr.buildingAt.set(cell, b);
+    return b;
+  };
+  const adjOf = c => gr.rails.adj.get(c) || [];
+
+  // Fabrik F1 mit zwei Städten in ihrem Radius (60)
+  const f1 = at(40, 40), c1 = at(60, 40), c2 = at(40, 70);
+  put(0, 'factory', f1);
+  put(0, 'city', c1);
+  put(0, 'city', c2);
+  gr.buildRailNetwork();
+  ok('Fabrik ist mit den Städten im Radius verbunden',
+    adjOf(f1).includes(c1) && adjOf(f1).includes(c2));
+  ok('Stadt–Stadt-Schiene im selben Fabrik-Radius', adjOf(c1).includes(c2));
+
+  // 2. Fabrik zu weit weg für direkten Kontakt (110 > 60), aber Stadt dazwischen
+  // liegt in BEIDEN Radien (60 zu f1, 50 zu f2) -> Netze verschmelzen
+  const f2 = at(150, 40), cMid = at(100, 40);
+  put(0, 'factory', f2);
+  put(0, 'city', cMid);
+  gr.buildRailNetwork();
+  const seen = new Set([f1]);
+  const stack = [f1];
+  while (stack.length) {
+    const n = stack.pop();
+    for (const m of adjOf(n)) if (!seen.has(m)) { seen.add(m); stack.push(m); }
+  }
+  ok('Netze verschmelzen über eine gemeinsame Stadt', seen.has(f2), `${seen.size} Knoten im Netz`);
+  ok('Fabriken haben keine direkte Schiene zueinander', !adjOf(f1).includes(f2));
+
+  // Bezahlung
+  const A = gr.players[0], B = gr.players[1];
+  const foreign = put(1, 'city', at(40, 10)); // Stadt von B, im Radius von f1
+  gr.buildRailNetwork();
+  A.money = 0; B.money = 0;
+  gr.payTrain({ owner: 0 }, foreign);
+  const notAllied = A.money;
+  ok('Fremde Station: beide verdienen', A.money > 0 && B.money > 0, `A +${A.money} / B +${B.money}`);
+
+  A.money = 0; B.money = 0;
+  gr.payTrain({ owner: 0 }, gr.buildingAt.get(c1)); // eigene Stadt
+  ok('Eigene Station: nur der Zug-Besitzer', A.money > 0 && B.money === 0, `A +${A.money} / B +${B.money}`);
+
+  gr.alliances.add(gr.allianceKey(0, 1));
+  A.money = 0; B.money = 0;
+  gr.payTrain({ owner: 0 }, foreign);
+  ok('Verbündete Station zahlt mehr als eine nicht-verbündete',
+    A.money > notAllied && B.money === A.money, `${notAllied} € -> ${A.money} €`);
+}
+
 console.log(results.join('\n'));
 const fails = results.filter(r => r.startsWith('FAIL')).length;
 console.log(`\n${results.length - fails}/${results.length} Tests bestanden`);

@@ -180,12 +180,20 @@
     <div id="hudTop">
       <div id="phaseInfo"></div>
     </div>
-    <div id="leaderboard"></div>
+    <!-- Rechte HUD-Spalte: Rangliste + laufende Angriffe darunter -->
+    <div id="hudRight">
+      <div id="leaderboard"></div>
+      <div id="attackList" class="hidden"></div>
+    </div>
+    <!-- Hover-Details zu einem Spieler der Rangliste (per JS befüllt) -->
+    <div id="lbTip" class="hidden"></div>
     <div id="hudBottom">
       <div id="statsRow">
         <div id="troopsInfo">Truppen: <b id="troopsLabel">0</b><span id="growthLabel"></span></div>
         <div id="moneyInfo">💰 <b id="moneyLabel">0</b> €</div>
       </div>
+      <!-- Truppenbalken: Füllstand bis zum Limit, Marke beim Wachstums-Maximum -->
+      <div id="troopBar"><div id="troopFill"></div><div id="troopPeak"></div></div>
       <div class="slider-wrap">
         <input id="ratioSlider" type="range" min="5" max="100" step="5" value="30">
         <span id="ratioLabel">30%</span>
