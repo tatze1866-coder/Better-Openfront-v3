@@ -12,6 +12,13 @@ const dict = {
   settingsIconTitle: { de: 'Einstellungen', en: 'Settings' },
   guideIconTitle: { de: 'Anleitung (bald verfügbar)', en: 'Guide (coming soon)' },
   statsIconTitle: { de: 'Statistik (bald verfügbar)', en: 'Stats (coming soon)' },
+  volumeLabel: { de: 'Lautstärke', en: 'Volume' },
+  animationsLabel: { de: 'Animationen', en: 'Animations' },
+  animOn: { de: 'An', en: 'On' },
+  animOff: { de: 'Aus', en: 'Off' },
+  showFpsLabel: { de: 'FPS-Anzeige', en: 'Show FPS' },
+  fpsOn: { de: 'An', en: 'On' },
+  fpsOff: { de: 'Aus', en: 'Off' },
 
   // ---------- Hauptmenü ----------
   soloHeading: { de: 'Einzelspieler', en: 'Singleplayer' },
