@@ -751,12 +751,14 @@ export class Game {
   }
 
   // Schienennetz-Graph neu aufbauen (einmal pro Runde, siehe turn()).
-  // Knoten sind Fabriken und Stationen (Städte/Häfen). Kanten entstehen
-  //  - zwischen einer Fabrik und jeder Station in ihrem Radius,
-  //  - zwischen zwei Stationen, die im Radius DERSELBEN Fabrik liegen (Stadt–Stadt).
-  // Zwei Fabrik-Netze verschmelzen dadurch automatisch, sobald eine Station in
-  // den Radius beider Fabriken faellt: sie ist dann Knoten in beiden Netzen und
-  // haengt die Komponenten zusammen.
+  // Knoten sind Fabriken und Stationen (Städte/Häfen). Je Fabrik entsteht ein
+  // minimaler Spannbaum ueber die Fabrik und alle Stationen in ihrem Radius:
+  // jedes Gebaeude wird an das naechstgelegene schon angebundene Gebaeude
+  // gehaengt. Es gibt also genau einen Weg zwischen zwei Stationen und keine
+  // ueberfluessige Direktschiene zurueck zur Fabrik.
+  // Zwei Fabrik-Netze verschmelzen automatisch, sobald eine Station in den
+  // Radius beider Fabriken faellt: sie ist dann Knoten in beiden Spannbaeumen
+  // und haengt die Komponenten zusammen.
   buildRailNetwork() {
     const adj = new Map();
     const edges = [];
@@ -774,12 +776,25 @@ export class Game {
     };
     for (const f of this.buildings) {
       if (f.kind !== 'factory') continue;
-      const stations = this.factoryStations(f);
-      for (let i = 0; i < stations.length; i++) {
-        link(f.cell, stations[i].cell);                 // Fabrik <-> Station
-        for (let j = i + 1; j < stations.length; j++) {
-          link(stations[i].cell, stations[j].cell);     // Stadt <-> Stadt
+      // Knoten dieses Netzes: die Fabrik selbst und jede Station in ihrem Radius
+      const nodes = [f.cell, ...this.factoryStations(f).map(s => s.cell)];
+      // Minimaler Spannbaum (Prim, ausgehend von der Fabrik): jede Station haengt
+      // sich an den naechstgelegenen bereits verbundenen Knoten. Dadurch entsteht
+      // eine Kette entlang der Gebaeude statt eines Sterns zur Fabrik -- eine
+      // Stadt hinter einer anderen wird ueber diese angebunden, nicht direkt.
+      const tree = [nodes[0]];
+      const rest = nodes.slice(1);
+      while (rest.length) {
+        let bestR = 0, bestT = 0, bestD = Infinity;
+        for (let i = 0; i < rest.length; i++) {
+          for (let j = 0; j < tree.length; j++) {
+            const d = this.dist2(rest[i], tree[j]);
+            if (d < bestD) { bestD = d; bestR = i; bestT = j; }
+          }
         }
+        link(tree[bestT], rest[bestR]);
+        tree.push(rest[bestR]);
+        rest.splice(bestR, 1);
       }
     }
     this.rails = { adj, edges };

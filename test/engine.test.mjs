@@ -515,7 +515,15 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   gr.buildRailNetwork();
   ok('Fabrik ist mit den Städten im Radius verbunden',
     adjOf(f1).includes(c1) && adjOf(f1).includes(c2));
-  ok('Stadt–Stadt-Schiene im selben Fabrik-Radius', adjOf(c1).includes(c2));
+  // Kette statt Stern: eine Stadt HINTER c1 haengt sich an c1 an, nicht an die
+  // Fabrik – der Weg dorthin fuehrt ueber die naeher gelegene Stadt.
+  const c3 = at(80, 40);
+  put(0, 'city', c3);
+  gr.buildRailNetwork();
+  ok('Stadt schließt an die nächstgelegene Stadt an', adjOf(c1).includes(c3));
+  ok('Keine Direktschiene von der hinteren Stadt zur Fabrik', !adjOf(f1).includes(c3));
+  ok('Nur ein Weg zwischen zwei Stationen (keine Dreiecke)',
+    !adjOf(c1).includes(c2) && gr.rails.edges.length === 3, `${gr.rails.edges.length} Kanten`);
 
   // 2. Fabrik zu weit weg für direkten Kontakt (110 > 60), aber Stadt dazwischen
   // liegt in BEIDEN Radien (60 zu f1, 50 zu f2) -> Netze verschmelzen
