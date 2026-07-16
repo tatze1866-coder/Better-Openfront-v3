@@ -465,6 +465,16 @@ button.primary:hover { background: #f4845f; }
   color: #f0d68a; padding: 1px 6px; border-radius: 3px;
   border: 1px solid #8a6d2f; background: rgba(138, 109, 47, 0.2);
 }
+/* Versionsnummer neben "Neuigkeiten" – zeigt den ausgelieferten Stand */
+.news-version {
+  font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 1px;
+  color: #b89a52; vertical-align: middle;
+}
+.news-date {
+  display: block; margin-top: 8px; text-align: right;
+  font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 1px;
+  color: #8a7a4f;
+}
 
 /* ---- Rechte Spalte: Mehrspieler ---- */
 #menu .create-lobby {

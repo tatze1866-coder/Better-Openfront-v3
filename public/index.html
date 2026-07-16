@@ -86,11 +86,12 @@
           </div>
 
           <section class="panel panel-news">
-            <h2>Latest News</h2>
-            <ul class="news-list">
-              <li><i>◆</i><span>New Map: Highland Isles</span><b class="badge-new">NEW</b></li>
-              <li><i>◆</i><span>Improved AI &amp; Balance</span></li>
-              <li><i>◆</i><span>Performance Improvements</span></li>
+            <h2>Neuigkeiten <span id="newsVersion" class="news-version"></span></h2>
+            <!-- Wird aus dem CHANGELOG befüllt (siehe loadNews in main.js).
+                 Die Versionsnummer daneben zeigt, welchen Stand der Server
+                 gerade ausliefert – praktisch zum Prüfen des Deployments. -->
+            <ul class="news-list" id="newsList">
+              <li><i>◆</i><span>Lade Neuigkeiten …</span></li>
             </ul>
           </section>
         </div>

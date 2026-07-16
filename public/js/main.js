@@ -58,6 +58,73 @@ for (const selId of ['soloSize', 'lobbySize']) {
   sel.value = 'mittel';
 }
 
+// "Neuigkeiten" im Menü aus dem CHANGELOG bauen. Es wird der jüngste
+// Versionsblock genommen und pro Aufzählungspunkt die fettgedruckte
+// Kurzüberschrift (**...**) angezeigt. Der Server liefert CHANGELOG.md über
+// eine eigene Route aus (siehe server.js). Die Versionsnummer daneben zeigt,
+// welchen Stand der Server gerade ausliefert – praktisch, um nach einem Deploy
+// zu prüfen, ob die neue Version wirklich online ist.
+async function loadNews() {
+  const list = $('newsList');
+  try {
+    const res = await fetch('CHANGELOG.md', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+
+    // Ersten Versionsblock herausschneiden: von "## [x.y.z] – Datum" bis zur
+    // nächsten "## "-Überschrift.
+    const head = text.match(/^##\s*\[([^\]]+)\]([^\n]*)$/m);
+    if (!head) throw new Error('Kein Versionsblock gefunden');
+    const version = head[1];
+    const date = (head[2].match(/[0-9]{4}-[0-9]{2}-[0-9]{2}/) || [''])[0];
+    const rest = text.slice(head.index + head[0].length);
+    const block = rest.split(/^##\s/m)[0];
+
+    // Fette Kurzüberschrift je Aufzählungspunkt "- **Titel**: ..." sammeln;
+    // fehlt das Fettgedruckte, den Text bis zum Doppelpunkt nehmen.
+    const items = [];
+    for (const m of block.matchAll(/^\s*[-*]\s+(.*)$/gm)) {
+      const bold = m[1].match(/\*\*(.+?)\*\*/);
+      let label = bold ? bold[1] : m[1].split(':')[0];
+      label = label.replace(/\*\*/g, '').replace(/`/g, '').trim();
+      if (label) items.push(label);
+    }
+
+    $('newsVersion').textContent = 'v' + version;
+    list.innerHTML = '';
+    for (let i = 0; i < items.length && i < 5; i++) {
+      const li = document.createElement('li');
+      const ico = document.createElement('i');
+      ico.textContent = '◆';
+      const span = document.createElement('span');
+      span.textContent = items[i];       // textContent = sicher gegen HTML
+      li.append(ico, span);
+      if (i === 0) {
+        const badge = document.createElement('b');
+        badge.className = 'badge-new';
+        badge.textContent = 'NEU';
+        li.appendChild(badge);
+      }
+      list.appendChild(li);
+    }
+    if (date) {
+      const d = document.createElement('div');
+      d.className = 'news-date';
+      d.textContent = date;
+      list.appendChild(d);
+    }
+  } catch (err) {
+    // Fällt der Abruf aus, bleibt eine dezente Meldung statt Platzhalter-Fakes.
+    $('newsVersion').textContent = '';
+    list.innerHTML = '';
+    const li = document.createElement('li');
+    li.innerHTML = '<i>◆</i><span>Neuigkeiten nicht verfügbar</span>';
+    list.appendChild(li);
+    console.warn('Neuigkeiten konnten nicht geladen werden:', err.message);
+  }
+}
+loadNews();
+
 // Host sendet die komplette Lobby-Konfiguration bei jeder Änderung
 function sendCfg() {
   if (isHost && ws) {

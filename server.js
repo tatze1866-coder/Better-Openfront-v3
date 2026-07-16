@@ -20,6 +20,9 @@ const MAP_TYPES = ['random', 'world', 'europe', 'asia', 'africa', 'namerica', 's
 
 // Statischer Webserver: liefert die Dateien aus public/ (Spiel-Client) aus.
 const app = express();
+// Changelog ausliefern, damit das Menue daraus die "Latest News" bauen kann.
+// Liegt im Repo-Root, nicht in public/ – deshalb eine eigene Route.
+app.get('/CHANGELOG.md', (_req, res) => res.sendFile(path.join(__dirname, 'CHANGELOG.md')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // WebSocket-Server fuer die Echtzeit-Kommunikation (Lobby + Zuege) auf /ws.
