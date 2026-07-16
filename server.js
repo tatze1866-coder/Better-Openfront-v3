@@ -75,7 +75,7 @@ function lobbyState(room) {
   return {
     t: 'lobby',
     code: room.code,
-    players: room.clients.map(c => ({ cid: c.cid, name: c.name })),
+    players: room.clients.map(c => ({ cid: c.cid, name: c.name, color: c.color || null })),
     hostCid: room.clients.length ? room.clients[0].cid : null,
     bots: room.bots,
     nations: room.nations,
@@ -118,7 +118,7 @@ function handleMessage(ws, m) {
         interval: null,      // Timer-Handle der Zug-Schleife
       };
       rooms.set(room.code, room);
-      const client = { ws, cid: nextClientId++, name: cleanName(m.name), idx: -1 };
+      const client = { ws, cid: nextClientId++, name: cleanName(m.name), idx: -1, color: null };
       room.clients.push(client);
       ws.room = room;        // Room/Client am Socket vermerken (Rueckverweis)
       ws.client = client;
@@ -133,7 +133,7 @@ function handleMessage(ws, m) {
       if (!room) return send(ws, { t: 'error', msg: 'Lobby nicht gefunden.' });
       if (room.started) return send(ws, { t: 'error', msg: 'Spiel läuft bereits.' });
       if (room.clients.length >= MAX_HUMANS) return send(ws, { t: 'error', msg: 'Lobby ist voll (max. 5 Spieler).' });
-      const client = { ws, cid: nextClientId++, name: cleanName(m.name), idx: -1 };
+      const client = { ws, cid: nextClientId++, name: cleanName(m.name), idx: -1, color: null };
       room.clients.push(client);
       ws.room = room;
       ws.client = client;
@@ -156,6 +156,18 @@ function handleMessage(ws, m) {
       broadcast(room, lobbyState(room));
       break;
     }
+    // Eigene Spielerfarbe waehlen (jeder Spieler, nur in der Lobby).
+    // Ungueltig/null = Automatik; bereits vergebene Farben werden abgelehnt.
+    case 'color': {
+      const room = ws.room;
+      if (!room || room.started) return;
+      const c = typeof m.color === 'string' ? m.color.toLowerCase() : null;
+      if (c && !/^#[0-9a-f]{6}$/.test(c)) return;
+      if (c && room.clients.some(cl => cl !== ws.client && cl.color === c)) return;
+      ws.client.color = c;
+      broadcast(room, lobbyState(room));
+      break;
+    }
     // Spiel starten (nur Host): Spielerliste + Bots festlegen, gemeinsamen Seed
     // an alle schicken und die Zug-Schleife starten.
     case 'start': {
@@ -166,7 +178,7 @@ function handleMessage(ws, m) {
       // Menschliche Spieler bekommen ihren Index (idx) = Reihenfolge in clients
       const players = room.clients.map((c, i) => {
         c.idx = i;
-        return { name: c.name, bot: false };
+        return { name: c.name, bot: false, color: c.color || undefined };
       });
       // Nationen (starke Bots, Schwierigkeit aus der Lobby) und dahinter die
       // vielen schwachen Masse-Bots anhaengen

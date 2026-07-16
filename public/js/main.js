@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
 import { Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
@@ -161,6 +161,47 @@ wireSeg('lobbyLevelSeg', l => {
   sendCfg();
 });
 
+// ---------- Farbwahl ----------
+// Eigene Spielerfarbe: Klick wählt sie, erneuter Klick = zurück zur Automatik.
+// Die Wahl bleibt über localStorage erhalten und gilt für Solo UND Lobby.
+let myColor = localStorage.getItem('ofMyColor');
+if (myColor && !/^#[0-9a-f]{6}$/i.test(myColor)) myColor = null;
+
+function buildColorRow(rowId, onPick) {
+  const row = $(rowId);
+  for (const c of PLAYER_COLORS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'color-swatch';
+    b.dataset.color = c;
+    b.style.background = c;
+    b.title = 'Eigene Farbe wählen (nochmal klicken = Automatik)';
+    b.addEventListener('click', () => onPick(c, b));
+    row.appendChild(b);
+  }
+}
+// Auswahl-/Vergeben-Markierungen einer Farbreihe aktualisieren
+function markColorRow(rowId, own, taken) {
+  for (const b of $(rowId).querySelectorAll('.color-swatch')) {
+    const c = b.dataset.color;
+    b.classList.toggle('sel', c === own);
+    b.classList.toggle('taken', !!taken && taken.has(c) && c !== own);
+  }
+}
+function rememberColor(c) {
+  myColor = c;
+  if (c) localStorage.setItem('ofMyColor', c);
+  else localStorage.removeItem('ofMyColor');
+  markColorRow('soloColors', myColor, null);
+}
+buildColorRow('soloColors', c => rememberColor(myColor === c ? null : c));
+buildColorRow('lobbyColors', c => {
+  const next = myColor === c ? null : c;
+  rememberColor(next);
+  wsSend({ t: 'color', color: next }); // Server prüft, ob die Farbe frei ist
+});
+markColorRow('soloColors', myColor, null);
+
 $('botCount').addEventListener('input', e => { $('botCountLabel').textContent = e.target.value; });
 $('nationCount').addEventListener('input', e => { $('nationCountLabel').textContent = e.target.value; });
 $('lobbyBots').addEventListener('input', e => {
@@ -175,7 +216,7 @@ $('lobbyNations').addEventListener('input', e => {
 $('btnSolo').addEventListener('click', () => {
   const bots = +$('botCount').value;
   const nations = +$('nationCount').value;
-  const players = [{ name: playerName(), bot: false }];
+  const players = [{ name: playerName(), bot: false, color: myColor || undefined }];
   // Nationen: wenige, stark (Schwierigkeit aus dem Menü), mit Ländernamen
   for (let i = 0; i < nations; i++) {
     players.push({ name: `${NATION_NAMES[i % NATION_NAMES.length]} ${BOT_LEVELS[soloLevel].icon}`, bot: true, level: soloLevel });
@@ -255,7 +296,14 @@ function updateLobby(m) {
   ul.innerHTML = '';
   for (const p of m.players) {
     const li = document.createElement('li');
-    li.textContent = p.name;
+    // Farbpunkt: gewählte Farbe des Spielers (grau = Automatik)
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = p.color || '#7a8ba0';
+    const nm = document.createElement('span');
+    nm.className = 'lobby-name';
+    nm.textContent = p.name;
+    li.append(dot, nm);
     if (p.cid === m.hostCid) {
       const tag = document.createElement('span');
       tag.className = 'tag';
@@ -264,6 +312,10 @@ function updateLobby(m) {
     }
     ul.appendChild(li);
   }
+  // Farbreihe: eigene Wahl markieren, von anderen vergebene Farben sperren
+  const mine = m.players.find(p => p.cid === myCid);
+  const taken = new Set(m.players.filter(p => p.cid !== myCid && p.color).map(p => p.color));
+  markColorRow('lobbyColors', mine && mine.color ? mine.color : null, taken);
   $('lobbyBots').value = m.bots;
   $('lobbyBotsLabel').textContent = m.bots;
   $('lobbyBots').disabled = !isHost;
@@ -316,6 +368,8 @@ function handleServerMsg(m) {
   switch (m.t) {
     case 'joined':
       myCid = m.cid;
+      // Gespeicherte Wunschfarbe direkt anmelden (Server prüft, ob sie frei ist)
+      if (myColor) wsSend({ t: 'color', color: myColor });
       showScreen('lobby');
       break;
     case 'lobby':

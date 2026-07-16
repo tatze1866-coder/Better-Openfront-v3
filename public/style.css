@@ -94,8 +94,11 @@ button.primary:hover { background: #f4845f; }
   margin-bottom: 6px;
   font-size: 15px;
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
+#lobbyPlayers li .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+#lobbyPlayers li .lobby-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #lobbyPlayers li .tag { color: #f4a261; font-size: 12px; }
 
 /* ---- Spiel-HUD ---- */
@@ -263,6 +266,19 @@ button.primary:hover { background: #f4845f; }
 .slider-wrap input { flex: 1; }
 #ratioLabel { width: 44px; text-align: right; font-weight: 600; color: #f4a261; }
 #hudBottom .hint { margin: 0; }
+
+/* Farbwahl: kleine klickbare Felder; gewählt = goldener Rahmen, vergeben = blass */
+.color-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.color-row .color-swatch {
+  width: 22px; height: 22px; flex: 0 0 auto;
+  margin: 0; padding: 0;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.color-row .color-swatch:hover { transform: scale(1.15); }
+.color-row .color-swatch.sel { border-color: #f0d68a; box-shadow: 0 0 8px rgba(240, 214, 138, 0.8); }
+.color-row .color-swatch.taken { opacity: 0.22; cursor: not-allowed; }
 
 .seg { display: flex; gap: 6px; margin: 8px 0; }
 .seg button {

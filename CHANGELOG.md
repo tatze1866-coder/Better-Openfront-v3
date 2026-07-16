@@ -3,6 +3,20 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.12.0] – 2026-07-16
+
+### Hinzugefügt
+- **Eigene Farbe wählbar**: Im Solo-Menü und in der Lobby („Deine Farbe")
+  kannst du dir eine der 20 Spielerfarben aussuchen – nochmal klicken =
+  Automatik. In der Lobby sind bereits vergebene Farben gesperrt; die Wahl
+  wird gespeichert und beim nächsten Mal wieder benutzt.
+
+### Geändert
+- **Detailliertere Karten**: Wasser hat jetzt einen Tiefenverlauf (helle
+  Küstensäume, dunkle offene See), neutrales Land sandige Strände und
+  fleckige Geländetöne, Reiche eine dezente Struktur. Rein optisch – die
+  Simulation bleibt unverändert.
+
 ## [0.11.1] – 2026-07-16
 
 ### Geändert

@@ -188,14 +188,28 @@ export class Game {
     // Menschen und Nationen bekommen die kräftigen Palettenfarben, Masse-Bots
     // (Profil WEAK_BOT_LEVEL) gedeckte generierte Farben – so bleiben die
     // wichtigen Akteure auf der Karte sofort erkennbar.
+    // Spieler können eine Wunschfarbe mitbringen (p.color): sie wird vorab
+    // reserviert; bei Duplikaten behält sie der Erste. Die automatische Vergabe
+    // überspringt reservierte Palettenfarben – so gibt es nie zwei gleiche.
+    const validColor = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+    const wish = players.map(p => (validColor(p.color) ? p.color.toLowerCase() : null));
+    const used = new Set();
+    for (let i = 0; i < wish.length; i++) {
+      if (wish[i] && used.has(wish[i])) wish[i] = null;
+      else if (wish[i]) used.add(wish[i]);
+    }
     let bright = 0, dull = 0;
+    const nextBright = () => {
+      while (used.has(PLAYER_COLORS[bright % PLAYER_COLORS.length])) bright++;
+      return PLAYER_COLORS[bright++ % PLAYER_COLORS.length];
+    };
     this.players = players.map((p, i) => {
       const botLevel = Math.max(0, Math.min(WEAK_BOT_LEVEL, (p.level === undefined ? 1 : p.level) | 0));
       const weak = !!p.bot && botLevel === WEAK_BOT_LEVEL;
       return {
         idx: i,
         name: p.name,
-        color: weak ? mutedColor(dull++) : PLAYER_COLORS[bright++ % PLAYER_COLORS.length],
+        color: wish[i] || (weak ? mutedColor(dull++) : nextBright()),
         isBot: !!p.bot,
         botLevel,
         alive: true,

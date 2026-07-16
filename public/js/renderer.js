@@ -7,11 +7,15 @@
 // werden; geaendert wird nur, was sich wirklich veraendert hat (markDirty).
 
 import { FACTORY_RADIUS } from './engine.js';
+import { hash2 } from './rng.js';
 
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
-const WATER = [45, 90, 140];
+// Wasser wird nach Tiefe verlaufen gezeichnet (Kueste hell -> offene See dunkel).
+const WATER_SHALLOW = [68, 128, 178];
+const WATER_DEEP = [30, 66, 112];
 const NEUTRAL = [181, 173, 138];
 const NEUTRAL_EDGE = [160, 152, 118];   // etwas dunkler fuer Grenzkanten
+const SAND = [216, 203, 158];           // Strandton fuer neutrale Kuestenzellen
 
 // Hex-Farbe ("#rrggbb") in ein [R,G,B]-Array umwandeln.
 function hexToRgb(hex) {
@@ -56,6 +60,9 @@ export class Renderer {
     this.colors = game.players.map(p => hexToRgb(p.color));
     this.colorsEdge = this.colors.map(c => darken(c, 0.62));
 
+    // Statische Gelaende-Details (Wassertiefe + Rauschen) einmal vorberechnen
+    this.computeTerrainDetail();
+
     // Cache fuer die Namens-Label-Positionen (groesste Flaeche je Spieler),
     // wird nur periodisch neu berechnet (siehe updateLabels).
     this.labelCache = new Map();
@@ -78,33 +85,91 @@ export class Renderer {
     this.canvas.height = window.innerHeight;
   }
 
-  // Farbe einer einzelnen Zelle bestimmen (Wasser / neutral / Spielerfarbe),
-  // Randzellen zusaetzlich abgedunkelt, damit Reichsgrenzen sichtbar werden.
-  cellColor(c) {
-    const g = this.game;
-    if (g.map.terrain[c] === 0) return WATER;
-    const o = g.owner[c];
-    // Randzellen dunkler zeichnen (Grenzen sichtbar machen): eine Zelle ist
-    // "Rand", wenn eine angrenzende Landzelle einem anderen Besitzer gehoert.
-    const w = g.map.w, h = g.map.h;
-    const x = c % w, y = (c / w) | 0;
-    let edge = false;
-    if (x > 0 && g.map.terrain[c - 1] === 1 && g.owner[c - 1] !== o) edge = true;
-    else if (x < w - 1 && g.map.terrain[c + 1] === 1 && g.owner[c + 1] !== o) edge = true;
-    else if (y > 0 && g.map.terrain[c - w] === 1 && g.owner[c - w] !== o) edge = true;
-    else if (y < h - 1 && g.map.terrain[c + w] === 1 && g.owner[c + w] !== o) edge = true;
-    if (o < 0) return edge ? NEUTRAL_EDGE : NEUTRAL;
-    return edge ? this.colorsEdge[o] : this.colors[o];
+  // Statische Gelaende-Details einmal vorberechnen – rein optisch, die
+  // Simulation kennt weiterhin nur Wasser/Land:
+  // - depth: Wasser-Abstand zur Kueste (1..6, BFS) fuer den Tiefenverlauf
+  // - noise: Hell-Dunkel-Rauschen je Zelle (grobe Flecken + feines Korn)
+  computeTerrainDetail() {
+    const { w, h, terrain } = this.game.map;
+    const n = w * h;
+    const depth = new Uint8Array(n);
+    const queue = [];
+    for (let c = 0; c < n; c++) {
+      if (terrain[c] !== 0) continue;
+      const x = c % w, y = (c / w) | 0;
+      if ((x > 0 && terrain[c - 1] === 1) || (x < w - 1 && terrain[c + 1] === 1) ||
+          (y > 0 && terrain[c - w] === 1) || (y < h - 1 && terrain[c + w] === 1)) {
+        depth[c] = 1;
+        queue.push(c);
+      }
+    }
+    for (let qi = 0; qi < queue.length; qi++) {
+      const c = queue[qi];
+      const d = depth[c];
+      if (d >= 6) continue;
+      const x = c % w, y = (c / w) | 0;
+      if (x > 0 && terrain[c - 1] === 0 && depth[c - 1] === 0) { depth[c - 1] = d + 1; queue.push(c - 1); }
+      if (x < w - 1 && terrain[c + 1] === 0 && depth[c + 1] === 0) { depth[c + 1] = d + 1; queue.push(c + 1); }
+      if (y > 0 && terrain[c - w] === 0 && depth[c - w] === 0) { depth[c - w] = d + 1; queue.push(c - w); }
+      if (y < h - 1 && terrain[c + w] === 0 && depth[c + w] === 0) { depth[c + w] = d + 1; queue.push(c + w); }
+    }
+    this.depth = depth;
+
+    const noise = new Float32Array(n);
+    const seed = this.game.seed | 0;
+    for (let c = 0; c < n; c++) {
+      const x = c % w, y = (c / w) | 0;
+      const patch = hash2(x >> 2, y >> 2, seed);       // 4x4-Flecken (Gelaende-Toene)
+      const grain = hash2(x, y, seed ^ 0x9e37);        // feines Korn
+      noise[c] = (patch - 0.5) * 0.65 + (grain - 0.5) * 0.35; // -0.5 .. 0.5
+    }
+    this.noise = noise;
   }
 
   // Eine Zelle in die Rohpixel (this.img) schreiben (4 Bytes: R,G,B,A).
+  // Wasser: Tiefenverlauf (Kueste hell -> See dunkel) + leichtes Rauschen.
+  // Neutrales Land: deutlich strukturiert, Kuestenzellen als sandiger Strand.
+  // Reiche: Spielerfarbe mit dezentem Rauschen; Grenzkanten bleiben dunkler.
   paintCell(c) {
-    const rgb = this.cellColor(c);
+    const g = this.game;
+    const w = g.map.w, h = g.map.h;
+    let r, gr, b;
+    if (g.map.terrain[c] === 0) {
+      const t = Math.min(1, (this.depth[c] - 1) / 5);  // 0 = Kueste, 1 = offene See
+      const f = 1 + this.noise[c] * 0.08;
+      r = (WATER_SHALLOW[0] + (WATER_DEEP[0] - WATER_SHALLOW[0]) * t) * f;
+      gr = (WATER_SHALLOW[1] + (WATER_DEEP[1] - WATER_SHALLOW[1]) * t) * f;
+      b = (WATER_SHALLOW[2] + (WATER_DEEP[2] - WATER_SHALLOW[2]) * t) * f;
+    } else {
+      const o = g.owner[c];
+      const x = c % w, y = (c / w) | 0;
+      // Randzellen dunkler zeichnen (Grenzen sichtbar machen): eine Zelle ist
+      // "Rand", wenn eine angrenzende Landzelle einem anderen Besitzer gehoert.
+      let edge = false, coast = false;
+      if (x > 0) { if (g.map.terrain[c - 1] === 0) coast = true; else if (g.owner[c - 1] !== o) edge = true; }
+      if (x < w - 1) { if (g.map.terrain[c + 1] === 0) coast = true; else if (g.owner[c + 1] !== o) edge = true; }
+      if (y > 0) { if (g.map.terrain[c - w] === 0) coast = true; else if (g.owner[c - w] !== o) edge = true; }
+      if (y < h - 1) { if (g.map.terrain[c + w] === 0) coast = true; else if (g.owner[c + w] !== o) edge = true; }
+      let base;
+      let amp; // Staerke des Rauschens
+      if (o < 0) {
+        base = coast && !edge ? SAND : edge ? NEUTRAL_EDGE : NEUTRAL;
+        amp = 0.16;
+      } else {
+        base = edge ? this.colorsEdge[o] : this.colors[o];
+        amp = 0.09;
+      }
+      const f = 1 + this.noise[c] * amp;
+      r = base[0] * f;
+      gr = base[1] * f;
+      b = base[2] * f;
+    }
     const i = c * 4;
-    this.img.data[i] = rgb[0];
-    this.img.data[i + 1] = rgb[1];
-    this.img.data[i + 2] = rgb[2];
-    this.img.data[i + 3] = 255;
+    const D = this.img.data;
+    D[i] = r > 255 ? 255 : r;
+    D[i + 1] = gr > 255 ? 255 : gr;
+    D[i + 2] = b > 255 ? 255 : b;
+    D[i + 3] = 255;
   }
 
   // Komplette Karte neu einfaerben (nur zum Start noetig).

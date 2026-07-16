@@ -723,6 +723,39 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Masse-Bots expandieren ins Neutrale', weakTerr > 20 * 30, `${weakTerr} Zellen gesamt`);
 }
 
+// ---- Spiel 12e: Wunschfarben ----
+{
+  const mk = players => new Game({ seed: 7, mapSize: 'klein', mapType: 'random', players });
+  // Wunschfarbe wird übernommen; die Automatik überspringt sie
+  const g1 = mk([
+    { name: 'A', bot: false, color: PLAYER_COLORS[0] },   // wünscht die 1. Palettenfarbe
+    { name: 'B', bot: false },                            // Automatik
+    { name: 'N', bot: true, level: 2 },                   // Nation, Automatik
+  ]);
+  ok('Wunschfarbe wird übernommen', g1.players[0].color === PLAYER_COLORS[0]);
+  ok('Automatik überspringt vergebene Farben',
+    g1.players[1].color === PLAYER_COLORS[1] && g1.players[2].color === PLAYER_COLORS[2]);
+  // Bei doppeltem Wunsch behält ihn der Erste
+  const g2 = mk([
+    { name: 'A', bot: false, color: '#4361ee' },
+    { name: 'B', bot: false, color: '#4361ee' },
+  ]);
+  ok('Doppelter Wunsch: der Erste behält die Farbe',
+    g2.players[0].color === '#4361ee' && g2.players[1].color !== '#4361ee');
+  // Ungültige Wünsche fallen auf die Automatik zurück; nie zwei gleiche Farben
+  const g3 = mk([
+    { name: 'A', bot: false, color: 'rot' },
+    { name: 'B', bot: false, color: PLAYER_COLORS[5] },
+    { name: 'N1', bot: true, level: 2 },
+    { name: 'N2', bot: true, level: 1 },
+    { name: 'Bot', bot: true, level: WEAK_BOT_LEVEL },
+  ]);
+  const colors = g3.players.map(p => p.color);
+  ok('Ungültiger Wunsch -> Automatik', /^#[0-9a-f]{6}$/.test(colors[0]));
+  ok('Keine zwei Spieler teilen sich eine Farbe', new Set(colors).size === colors.length,
+    colors.join(' '));
+}
+
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----
 {
   const gc = newGame(7);
