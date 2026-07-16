@@ -14,7 +14,15 @@ const { WebSocketServer } = require('ws');
 const PORT = process.env.PORT || 3000;
 const TURN_MS = 100;          // Takt: alle 100ms ein Zug (10 Zuege/Sekunde)
 const MAX_HUMANS = 5;         // max. menschliche Spieler pro Lobby
-const MAX_BOTS = 15;
+const MAX_BOTS = 30;          // Masse-Bots (schwach, Engine-Profil 3)
+const MAX_NATIONS = 8;        // Nationen (starke Bots, Level 0-2)
+const WEAK_BOT_LEVEL = 3;     // Engine-Profil der Masse-Bots
+// Muss zur NATION_NAMES-Liste in public/js/engine.js passen (dort ESM, hier
+// CommonJS – deshalb dupliziert). Änderungen beidseitig pflegen!
+const NATION_NAMES = [
+  '🇩🇪 Deutschland', '🇫🇷 Frankreich', '🇬🇧 England', '🇪🇸 Spanien',
+  '🇮🇹 Italien', '🇷🇺 Russland', '🇺🇸 USA', '🇯🇵 Japan',
+];
 const MAP_SIZES = ['klein', 'mittel', 'gross', 'riesig'];
 const MAP_TYPES = ['random', 'world', 'europe', 'asia', 'africa', 'namerica', 'samerica', 'australia'];
 
@@ -70,6 +78,7 @@ function lobbyState(room) {
     players: room.clients.map(c => ({ cid: c.cid, name: c.name })),
     hostCid: room.clients.length ? room.clients[0].cid : null,
     bots: room.bots,
+    nations: room.nations,
     botLevel: room.botLevel,
     mapType: room.mapType,
     mapSize: room.mapSize,
@@ -98,7 +107,8 @@ function handleMessage(ws, m) {
       const room = {
         code: makeCode(),
         clients: [],
-        bots: 3,
+        bots: 10,
+        nations: 3,
         botLevel: 1,
         mapType: 'random',
         mapSize: 'mittel',
@@ -139,6 +149,7 @@ function handleMessage(ws, m) {
       if (room.clients[0] !== ws.client) return; // nur Host
       // Werte defensiv begrenzen/pruefen, bevor sie uebernommen werden
       if (m.n !== undefined) room.bots = Math.max(0, Math.min(MAX_BOTS, m.n | 0));
+      if (m.nations !== undefined) room.nations = Math.max(0, Math.min(MAX_NATIONS, m.nations | 0));
       if (m.level !== undefined) room.botLevel = Math.max(0, Math.min(2, m.level | 0));
       if (MAP_TYPES.includes(m.mapType)) room.mapType = m.mapType;
       if (MAP_SIZES.includes(m.mapSize)) room.mapSize = m.mapSize;
@@ -157,9 +168,13 @@ function handleMessage(ws, m) {
         c.idx = i;
         return { name: c.name, bot: false };
       });
-      // Bots hinten anhaengen
+      // Nationen (starke Bots, Schwierigkeit aus der Lobby) und dahinter die
+      // vielen schwachen Masse-Bots anhaengen
+      for (let i = 0; i < room.nations; i++) {
+        players.push({ name: `${NATION_NAMES[i % NATION_NAMES.length]} ${BOT_ICONS[room.botLevel]}`, bot: true, level: room.botLevel });
+      }
       for (let i = 0; i < room.bots; i++) {
-        players.push({ name: `Bot ${i + 1} ${BOT_ICONS[room.botLevel]}`, bot: true, level: room.botLevel });
+        players.push({ name: `Bot ${i + 1}`, bot: true, level: WEAK_BOT_LEVEL });
       }
       // Gemeinsamer Seed -> alle Clients erzeugen dieselbe Karte/Simulation
       const seed = (Math.random() * 0x7fffffff) | 0;

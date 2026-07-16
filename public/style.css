@@ -533,7 +533,7 @@ button.primary:hover { background: #f4845f; }
 /* ---- Bots-Slider mit Wert und Endpunkten ---- */
 .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
 .slider-head b { font-family: 'Cinzel', serif; color: #f0d68a; font-size: 18px; }
-#menu #botCount { width: 100%; margin: 8px 0 2px; }
+#menu #botCount, #menu #nationCount { width: 100%; margin: 8px 0 2px; }
 .slider-ends {
   display: flex; justify-content: space-between;
   font-family: 'Cormorant Garamond', serif; font-size: 12px; color: #8a7a4f;

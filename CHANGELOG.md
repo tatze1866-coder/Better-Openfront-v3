@@ -3,6 +3,23 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.11.0] – 2026-07-16
+
+### Hinzugefügt
+- **Zwei Bot-Arten**: Masse-Bots (viele, absichtlich schwach – expandieren
+  nur langsam, bauen nichts, greifen kaum an) und **Nationen** (wenige,
+  stark, mit Ländernamen wie 🇩🇪 Deutschland). Die Schwierigkeit im Menü
+  gilt jetzt für die Nationen; Masse-Bots sind immer schwach.
+- **Viel mehr Bots**: bis zu 30 Masse-Bots + 8 Nationen (vorher max. 15
+  Bots) – einstellbar über zwei getrennte Regler in Solo und Lobby.
+
+### Geändert
+- **Farben**: Menschen und Nationen bekommen die kräftigen Farben,
+  Masse-Bots gedeckte Grautöne – wichtige Gegner stechen sofort hervor.
+- **Startgebiete**: Nationen starten größer, Masse-Bots kleiner.
+- **Rangliste** zeigt bei vielen Spielern nur noch die Top 12 plus die
+  eigene Zeile.
+
 ## [0.10.1] – 2026-07-16
 
 ### Geändert

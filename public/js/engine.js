@@ -119,12 +119,40 @@ export const PLAYER_COLORS = [
   '#ff70a6', '#003566', '#a3b18a', '#38b000', '#e0aaff',
 ];
 
-// Bot-Schwierigkeitsgrade: 0 = Leicht, 1 = Mittel, 2 = Schwer
+// Bot-Profile. 0–2 sind die Schwierigkeitsgrade der NATIONEN (starke Bots,
+// wählbar im Menü). Index 3 ist der Masse-Bot: absichtlich schlecht und passiv
+// – er expandiert langsam ins Neutrale, baut nichts, fährt keine Boote und
+// greift Spieler nur an, wenn er haushoch überlegen ist. Davon gibt es viele.
 export const BOT_LEVELS = [
   { name: 'Leicht', icon: '🟢', interval: 40, minTroops: 250, ratioN: 0.35, ratioE: 0.4, threshold: 1.5, allyAccept: 0.9, city: false, fort: false, boatMin: 700 },
   { name: 'Mittel', icon: '🟡', interval: 25, minTroops: 80, ratioN: 0.45, ratioE: 0.55, threshold: 1.1, allyAccept: 0.6, city: true, fort: false, boatMin: 300 },
   { name: 'Schwer', icon: '🔴', interval: 12, minTroops: 60, ratioN: 0.5, ratioE: 0.6, threshold: 0.95, allyAccept: 0.3, city: true, fort: true, boatMin: 200 },
+  { name: 'Bot', icon: '🤖', interval: 60, minTroops: 300, ratioN: 0.35, ratioE: 0.35, threshold: 3.0, allyAccept: 0.95, city: false, fort: false, boatMin: 1e9 },
 ];
+export const WEAK_BOT_LEVEL = 3;     // Index des Masse-Bot-Profils
+
+// Namen der Nationen (starke Bots). Reihenfolge = Vergabe-Reihenfolge.
+// ACHTUNG: server.js hat dieselbe Liste (CommonJS kann das ESM-Modul nicht
+// laden) – Änderungen dort mitziehen.
+export const NATION_NAMES = [
+  '🇩🇪 Deutschland', '🇫🇷 Frankreich', '🇬🇧 England', '🇪🇸 Spanien',
+  '🇮🇹 Italien', '🇷🇺 Russland', '🇺🇸 USA', '🇯🇵 Japan',
+];
+
+// Gedeckte, aber unterscheidbare Hex-Farbe für die Masse-Bots (der Renderer
+// parst Hex). Goldener Winkel verteilt die Farbtöne gleichmäßig; die niedrige
+// Sättigung lässt Menschen und Nationen (kräftige Palette) hervorstechen.
+function mutedColor(i) {
+  const h = (i * 137.508) % 360;
+  const s = 0.32, l = 0.5;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * c).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
 
 export class Game {
   constructor({ seed, players, mapSize = 'mittel', mapType = 'random' }) {
@@ -156,21 +184,29 @@ export class Game {
     this.allyRequests = new Set(); // "von:zu"
     this.dirty = [];               // in diesem Tick geänderte Zellen (fürs Rendering)
 
-    this.players = players.map((p, i) => ({
-      idx: i,
-      name: p.name,
-      color: PLAYER_COLORS[i % PLAYER_COLORS.length],
-      isBot: !!p.bot,
-      botLevel: Math.max(0, Math.min(2, (p.level === undefined ? 1 : p.level) | 0)),
-      alive: true,
-      troops: START_TROOPS,
-      money: START_MONEY,
-      territory: 0,
-      cities: 0,
-      forts: 0,
-      ports: 0,
-      factories: 0,
-    }));
+    // Menschen und Nationen bekommen die kräftigen Palettenfarben, Masse-Bots
+    // (Profil WEAK_BOT_LEVEL) gedeckte generierte Farben – so bleiben die
+    // wichtigen Akteure auf der Karte sofort erkennbar.
+    let bright = 0, dull = 0;
+    this.players = players.map((p, i) => {
+      const botLevel = Math.max(0, Math.min(WEAK_BOT_LEVEL, (p.level === undefined ? 1 : p.level) | 0));
+      const weak = !!p.bot && botLevel === WEAK_BOT_LEVEL;
+      return {
+        idx: i,
+        name: p.name,
+        color: weak ? mutedColor(dull++) : PLAYER_COLORS[bright++ % PLAYER_COLORS.length],
+        isBot: !!p.bot,
+        botLevel,
+        alive: true,
+        troops: START_TROOPS,
+        money: START_MONEY,
+        territory: 0,
+        cities: 0,
+        forts: 0,
+        ports: 0,
+        factories: 0,
+      };
+    });
 
     this.landCells = [];
     for (let i = 0; i < n; i++) if (this.map.terrain[i] === 1) this.landCells.push(i);
@@ -292,7 +328,9 @@ export class Game {
         if (score > bestScore) { bestScore = score; best = cand; }
       }
       spawns.push(best);
-      this.placeBlob(p.idx, best, 3);
+      // Nationen starten mit etwas mehr Land, Masse-Bots mit weniger
+      const r = !p.isBot ? 3 : p.botLevel === WEAK_BOT_LEVEL ? 2 : 4;
+      this.placeBlob(p.idx, best, r);
     }
   }
 

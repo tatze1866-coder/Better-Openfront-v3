@@ -1,5 +1,5 @@
 // Headless-Test der Spiel-Engine (Boote, Gebäude, Allianzen, Determinismus)
-import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK } from '../public/js/engine.js';
+import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS } from '../public/js/engine.js';
 
 const results = [];
 const ok = (name, cond, extra = '') => {
@@ -684,6 +684,43 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     Math.abs(p.troops - (before + max * 0.9)) < 1e-6 && fake.pool === 0);
   ga.turn([]);
   ok('Abgebrochener Angriff verschwindet', !ga.attacks.includes(fake));
+}
+
+// ---- Spiel 12d: Masse-Bots vs. Nationen ----
+{
+  const gn = new Game({
+    seed: 99, mapSize: 'klein', mapType: 'random',
+    players: [
+      { name: 'Mensch', bot: false },
+      { name: NATION_NAMES[0], bot: true, level: 2 },   // Nation (stark)
+      { name: 'Bot 1', bot: true, level: WEAK_BOT_LEVEL }, // Masse-Bot (schwach)
+    ],
+  });
+  const [hum, nat, weak] = gn.players;
+  ok('Masse-Bot-Profil existiert und ist passiv',
+    WEAK_BOT_LEVEL === 3 && !BOT_LEVELS[3].city && !BOT_LEVELS[3].fort && BOT_LEVELS[3].threshold >= 2);
+  ok('Masse-Bot behält sein Profil (kein Clamp auf 2)', weak.botLevel === WEAK_BOT_LEVEL);
+  ok('Mensch und Nation bekommen Palettenfarben',
+    PLAYER_COLORS.includes(hum.color) && PLAYER_COLORS.includes(nat.color));
+  ok('Masse-Bot bekommt eine gedeckte eigene Farbe',
+    !PLAYER_COLORS.includes(weak.color) && /^#[0-9a-f]{6}$/.test(weak.color), weak.color);
+  ok('Nation startet größer als der Masse-Bot', nat.territory > weak.territory,
+    `Nation ${nat.territory} / Mensch ${hum.territory} / Bot ${weak.territory} Zellen`);
+
+  // Viele Bots: Spiel mit 3 Nationen + 20 Masse-Bots läuft stabil, die
+  // Masse-Bots expandieren ins Neutrale (wenn auch langsam)
+  const players = [{ name: 'Mensch', bot: false }];
+  for (let i = 0; i < 3; i++) players.push({ name: NATION_NAMES[i], bot: true, level: 2 });
+  for (let i = 0; i < 20; i++) players.push({ name: `Bot ${i + 1}`, bot: true, level: WEAK_BOT_LEVEL });
+  const gm = new Game({ seed: 4242, mapSize: 'mittel', mapType: 'random', players });
+  while (gm.phase === 'spawn') gm.turn([]);
+  const t0 = Date.now();
+  for (let i = 0; i < 600; i++) gm.turn([]);
+  const ms = Date.now() - t0;
+  const weakTerr = gm.players.filter(p => p.botLevel === WEAK_BOT_LEVEL && p.alive)
+    .reduce((s, p) => s + p.territory, 0);
+  ok('24-Bot-Spiel läuft (600 Ticks)', true, `${ms}ms (${(ms / 600).toFixed(1)}ms/Tick)`);
+  ok('Masse-Bots expandieren ins Neutrale', weakTerr > 20 * 30, `${weakTerr} Zellen gesamt`);
 }
 
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----

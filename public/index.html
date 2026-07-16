@@ -61,13 +61,20 @@
           </div>
 
           <div class="slider-head">
-            <label for="botCount">Bots</label>
-            <b id="botCountLabel">4</b>
+            <label for="botCount">Bots (schwach)</label>
+            <b id="botCountLabel">15</b>
           </div>
-          <input id="botCount" type="range" min="1" max="15" value="4">
-          <div class="slider-ends"><span>1</span><span>15</span></div>
+          <input id="botCount" type="range" min="0" max="30" value="15">
+          <div class="slider-ends"><span>0</span><span>30</span></div>
 
-          <label class="block-label">Difficulty</label>
+          <div class="slider-head">
+            <label for="nationCount">Nationen (stark)</label>
+            <b id="nationCountLabel">4</b>
+          </div>
+          <input id="nationCount" type="range" min="0" max="8" value="4">
+          <div class="slider-ends"><span>0</span><span>8</span></div>
+
+          <label class="block-label">Stärke der Nationen</label>
           <div class="seg" id="soloLevelSeg">
             <button data-level="0">Easy</button>
             <button data-level="1" class="sel">Medium</button>
@@ -174,11 +181,15 @@
           <select id="lobbySize"></select>
         </div>
         <div class="row" id="lobbyBotsRow">
-          <label for="lobbyBots">Bots: <b id="lobbyBotsLabel">3</b></label>
-          <input id="lobbyBots" type="range" min="0" max="15" value="3">
+          <label for="lobbyBots">Bots (schwach): <b id="lobbyBotsLabel">10</b></label>
+          <input id="lobbyBots" type="range" min="0" max="30" value="10">
+        </div>
+        <div class="row" id="lobbyNationsRow">
+          <label for="lobbyNations">Nationen (stark): <b id="lobbyNationsLabel">3</b></label>
+          <input id="lobbyNations" type="range" min="0" max="8" value="3">
         </div>
 
-        <label class="block-label">Schwierigkeit</label>
+        <label class="block-label">Stärke der Nationen</label>
         <div class="seg" id="lobbyLevelSeg">
           <button data-level="0">🟢 Leicht</button>
           <button data-level="1" class="sel">🟡 Mittel</button>

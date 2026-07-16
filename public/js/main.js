@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
 import { Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
@@ -131,6 +131,7 @@ function sendCfg() {
     wsSend({
       t: 'cfg',
       n: +$('lobbyBots').value,
+      nations: +$('lobbyNations').value,
       level: lobbyLevel,
       mapType: $('lobbyMap').value,
       mapSize: $('lobbySize').value,
@@ -161,16 +162,27 @@ wireSeg('lobbyLevelSeg', l => {
 });
 
 $('botCount').addEventListener('input', e => { $('botCountLabel').textContent = e.target.value; });
+$('nationCount').addEventListener('input', e => { $('nationCountLabel').textContent = e.target.value; });
 $('lobbyBots').addEventListener('input', e => {
   $('lobbyBotsLabel').textContent = e.target.value;
+  sendCfg();
+});
+$('lobbyNations').addEventListener('input', e => {
+  $('lobbyNationsLabel').textContent = e.target.value;
   sendCfg();
 });
 
 $('btnSolo').addEventListener('click', () => {
   const bots = +$('botCount').value;
+  const nations = +$('nationCount').value;
   const players = [{ name: playerName(), bot: false }];
+  // Nationen: wenige, stark (Schwierigkeit aus dem Menü), mit Ländernamen
+  for (let i = 0; i < nations; i++) {
+    players.push({ name: `${NATION_NAMES[i % NATION_NAMES.length]} ${BOT_LEVELS[soloLevel].icon}`, bot: true, level: soloLevel });
+  }
+  // Masse-Bots: viele, absichtlich schwach (festes Profil)
   for (let i = 0; i < bots; i++) {
-    players.push({ name: `Bot ${i + 1} ${BOT_LEVELS[soloLevel].icon}`, bot: true, level: soloLevel });
+    players.push({ name: `Bot ${i + 1}`, bot: true, level: WEAK_BOT_LEVEL });
   }
   const seed = (Math.random() * 0x7fffffff) | 0;
   startGame(seed, players, 0, false, { mapType: $('soloMap').value, mapSize: $('soloSize').value });
@@ -255,6 +267,11 @@ function updateLobby(m) {
   $('lobbyBots').value = m.bots;
   $('lobbyBotsLabel').textContent = m.bots;
   $('lobbyBots').disabled = !isHost;
+  if (m.nations !== undefined) {
+    $('lobbyNations').value = m.nations;
+    $('lobbyNationsLabel').textContent = m.nations;
+  }
+  $('lobbyNations').disabled = !isHost;
   lobbyLevel = m.botLevel !== undefined ? m.botLevel : 1;
   setSeg('lobbyLevelSeg', lobbyLevel);
   for (const b of $('lobbyLevelSeg').querySelectorAll('button')) b.disabled = !isHost;
@@ -666,10 +683,17 @@ function lbRowFor(p) {
   return r;
 }
 
+const LB_MAX_ROWS = 12; // bei vielen Bots: nur die Top 12 (+ eigene Zeile) zeigen
+
 function updateLeaderboard() {
   const lb = $('leaderboard');
   const sorted = [...game.players].sort((a, b) => b.territory - a.territory);
-  for (const p of sorted) {
+  // Nur die Spitze anzeigen; die eigene Zeile hängt notfalls unten dran
+  const shown = sorted.slice(0, LB_MAX_ROWS);
+  if (myIdx >= 0 && game.players[myIdx] && !shown.some(p => p.idx === myIdx)) {
+    shown.push(game.players[myIdx]);
+  }
+  for (const p of shown) {
     const r = lbRowFor(p);
     r.classList.toggle('dead', !p.alive);
     let suffix = p.idx === myIdx ? ' (Du)' : '';
@@ -680,10 +704,14 @@ function updateLeaderboard() {
     r._val.textContent = `${(p.territory / game.map.landCount * 100).toFixed(1)}% · ${fmt(p.troops)}`;
   }
   // Nur umsortieren, wenn sich die Reihenfolge wirklich geändert hat
-  const order = sorted.map(p => p.idx).join(',');
+  const order = shown.map(p => p.idx).join(',');
   if (order !== lbOrder) {
     lbOrder = order;
-    for (const p of sorted) lb.appendChild(lbRowFor(p)); // appendChild verschiebt
+    // Zeilen von Spielern entfernen, die aus der Anzeige gerutscht sind
+    for (const [idx, r] of lbRows) {
+      if (!shown.some(p => p.idx === idx)) { r.remove(); lbRows.delete(idx); }
+    }
+    for (const p of shown) lb.appendChild(lbRowFor(p)); // appendChild verschiebt
   }
 }
 
