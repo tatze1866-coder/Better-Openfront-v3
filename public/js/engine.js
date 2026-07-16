@@ -28,12 +28,14 @@ export const MAP_TYPES = [
 ];
 
 // Wirtschaft (pro Tick)
-// Truppenwachstum folgt einer Kurve: Maximum bei 40% des Truppenlimits,
-// darunter ansteigend, darüber abfallend (0 bei vollem Limit).
-export const GROWTH_PEAK = 0.4;      // Maximum der Wachstumskurve (40% des Limits)
-const MAX_PER_TERRITORY = 120;
-const MAX_BASE = 800;
-const START_TROOPS = 512;
+// Truppenwachstum folgt einer Kurve: Maximum bei 42% des Truppenlimits,
+// darunter ansteigend, darüber abfallend (0 bei vollem Limit). Bei 80% ist das
+// Wachstum dadurch schon auf ~34% des Maximums eingebrochen.
+export const GROWTH_PEAK = 0.42;     // Maximum der Wachstumskurve (42% des Limits)
+const MAX_PER_TERRITORY = 3;         // Bevölkerung je eigener Zelle
+const MAX_BASE = 1000;
+const START_TROOPS = 400;
+const REFILL_TICKS = 240;            // Ticks von 0 aufs Limit bei vollem Wachstum
 
 // Geld (€): Basiseinkommen aus Gebiet; mehr über Handel und Züge
 const START_MONEY = 300;
@@ -50,23 +52,29 @@ const ENEMY_INTERVAL = 5;            // gegen Spieler: etwas langsamer
 const WIN_FRACTION = 0.7;            // 70% des Landes = Sieg
 
 // Gebäude – werden mit Geld (€) gebaut.
-// Der Preis verdoppelt sich pro gebautem Gebäude des Typs (max. 3x = 8-facher
-// Grundpreis). Häfen und Fabriken teilen sich dabei einen Zähler.
-export const BUILD_COSTS = { city: 250, fort: 200, port: 250, factory: 400 };
-const COST_DOUBLINGS_CAP = 3;
+// Der Preis verdoppelt sich pro gebautem Gebäude des Typs bis zu einem Deckel.
+// Städte gehen eine Stufe weiter (250 → 500 → 1.000 → 2.000 → 4.000): sie sind
+// mit +25.000 Bevölkerung die stärkste Einzelinvestition und sollen sich nicht
+// beliebig stapeln lassen. Häfen und Fabriken teilen sich dabei einen Zähler.
+export const BUILD_COSTS = { city: 250, fort: 300, port: 400, factory: 600 };
+const COST_DOUBLINGS_CAP = { city: 4, fort: 3, port: 3, factory: 3 };
 export const WARSHIP_COST = 300;
 const KIND_FIELD = { city: 'cities', fort: 'forts', port: 'ports', factory: 'factories' };
-const CITY_MAX_BONUS = 2500;         // Stadt: +max. Truppen
-const FORT_RADIUS2 = 64;             // Festung schützt im Radius 8
-const FORT_DEFENSE = 5;              // Eroberung dort 5x so teuer
+const CITY_MAX_BONUS = 25000;        // Stadt: +max. Truppen (wichtigstes Gebäude)
+const FORT_RADIUS2 = 900;            // Festung schützt im Radius 30
+const FORT_DEFENSE = 5;              // Eroberung dort 5x so teuer (stapelt nicht)
 const MIN_BUILD_DIST2 = 100;         // Mindestabstand 10 zwischen eigenen Gebäuden
 
 // Häfen & Handel
 const TRADE_INTERVAL = 100;          // Hafen versucht alle 10s ein Handelsschiff
 const TRADE_CAP_PER_PORT = 2;        // aktive Handelsschiffe je Hafen
 const TRADE_SPEED = 1.5;             // Wasserzellen pro Tick
+// Handelsgold = BASE + COEF * Weglänge^EXP. Der Exponent > 1 macht lange Routen
+// überproportional lohnend (Vorbild: 10.000 + 150 * d^1,1, auf unsere
+// Geld-Größenordnung heruntergerechnet).
 const TRADE_VALUE_BASE = 40;         // € bei Ankunft (beide Seiten)
-const TRADE_VALUE_PER_CELL = 0.35;   // € je Wegzelle
+const TRADE_VALUE_COEF = 0.6;        // € je Wegzelle^EXP
+const TRADE_VALUE_EXP = 1.1;         // > 1 = weite Routen zahlen überproportional
 
 // Kriegsschiffe
 const WARSHIP_RANGE2 = 36;           // Schussweite 6
@@ -399,14 +407,15 @@ export class Game {
     }
   }
 
-  // Aktueller Preis: verdoppelt sich je gebautem Gebäude des Typs (max. 8x).
-  // Häfen und Fabriken teilen sich den Zähler.
+  // Aktueller Preis: verdoppelt sich je gebautem Gebäude des Typs, gedeckelt bei
+  // COST_DOUBLINGS_CAP (Städte 16x, sonst 8x). Festungen haben keinen Zähler und
+  // bleiben immer gleich teuer. Häfen und Fabriken teilen sich einen Zähler.
   buildCostOf(pIdx, kind) {
     const p = this.players[pIdx];
     let count = 0;
     if (kind === 'city') count = p.cities;
     else if (kind === 'port' || kind === 'factory') count = p.ports + p.factories;
-    return BUILD_COSTS[kind] * Math.pow(2, Math.min(COST_DOUBLINGS_CAP, count));
+    return BUILD_COSTS[kind] * Math.pow(2, Math.min(COST_DOUBLINGS_CAP[kind], count));
   }
 
   // null = Bauen erlaubt, sonst Fehlermeldung
@@ -622,7 +631,7 @@ export class Game {
         s.done = true;
         const port = this.buildingAt.get(s.to);
         if (port && port.kind === 'port') {
-          const value = TRADE_VALUE_BASE + s.path.length * TRADE_VALUE_PER_CELL;
+          const value = TRADE_VALUE_BASE + TRADE_VALUE_COEF * Math.pow(s.path.length, TRADE_VALUE_EXP);
           this.players[s.owner].money += value;
           if (this.players[port.owner].alive) this.players[port.owner].money += value;
         }
@@ -912,7 +921,11 @@ export class Game {
     const curve = f < GROWTH_PEAK
       ? 0.3 + 0.7 * (f / GROWTH_PEAK)
       : Math.max(0, (1 - f) / (1 - GROWTH_PEAK));
-    return (3 + p.territory * 0.028 + p.cities * 4) * curve;
+    // Das Wachstum haengt direkt an der Kapazitaet: bei vollem Tempo waere das
+    // Limit nach REFILL_TICKS erreicht. Dadurch bleibt der Fuellstand (und damit
+    // die Kurve oben) unabhaengig von der Reichsgroesse aussagekraeftig -- eine
+    // Stadt beschleunigt das Wachstum genau so stark, wie sie das Limit hebt.
+    return (max / REFILL_TICKS) * curve;
   }
 
   // Wirtschaft pro Tick: jeder lebende Spieler bekommt Truppennachwuchs (bis zum

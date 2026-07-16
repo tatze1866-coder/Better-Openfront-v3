@@ -3,6 +3,27 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.8.0] – 2026-07-16
+
+### Geändert
+- **Bevölkerung an die Referenz angeglichen**: Eine Zelle trägt jetzt 3
+  Bevölkerung (statt 120), eine Stadt +25.000 (statt +2.500). Städte sind
+  damit wie vorgesehen das wichtigste Gebäude – eine Stadt entspricht 8.333
+  Feldern statt bisher 21.
+- **Wachstum hängt an der Kapazität** (`max / REFILL_TICKS * Kurve`) statt an
+  festen Koeffizienten. Vorher klebte der Füllstand bei 0–7%, wodurch die
+  Wachstumskurve wirkungslos war und die Bots nie Städte bauten (ihre Regel
+  verlangt 60% Füllstand). Jetzt durchläuft der Füllstand den ganzen Bereich.
+- **Wachstums-Maximum bei 42%** des Limits (vorher 40%).
+- **Festungs-Radius 30** statt 8 Felder. 5x Verteidigung und das Nicht-Stapeln
+  mehrerer Festungen galten bereits.
+- **Handelsgold steigt überproportional mit der Distanz**:
+  `40 + 0,6 * Distanz^1,1` statt linear `40 + 0,35 * Distanz`. Entspricht der
+  Referenzformel `10.000 + 150 * d^1,1`, auf unsere Geld-Größenordnung
+  heruntergerechnet. Handel bringt dadurch rund 2,6x mehr.
+- **Preise**: Stadt geht eine Verdopplung weiter (250 → 500 → 1.000 → 2.000 →
+  4.000 €), Festung 200 → 300 €, Hafen 250 → 400 €, Fabrik 400 → 600 €.
+
 ## [0.7.1] – 2026-07-15
 
 ### Geändert

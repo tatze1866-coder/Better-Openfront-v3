@@ -1,5 +1,5 @@
 // Headless-Test der Spiel-Engine (Boote, Gebäude, Allianzen, Determinismus)
-import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES } from '../public/js/engine.js';
+import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK } from '../public/js/engine.js';
 
 const results = [];
 const ok = (name, cond, extra = '') => {
@@ -347,12 +347,28 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   const p0 = gk.players[0];
   const max = gk.maxTroopsOf(p0);
   p0.troops = max * 0.1; const g10 = gk.troopGrowthOf(p0);
-  p0.troops = max * 0.4; const g40 = gk.troopGrowthOf(p0);
+  p0.troops = max * GROWTH_PEAK; const gPeak = gk.troopGrowthOf(p0);
+  p0.troops = max * 0.8; const g80 = gk.troopGrowthOf(p0);
   p0.troops = max * 0.9; const g90 = gk.troopGrowthOf(p0);
   p0.troops = max; const g100 = gk.troopGrowthOf(p0);
-  ok('Wachstumskurve: Maximum bei 40% des Limits', g40 > g10 && g40 > g90,
-    `10%: ${g10.toFixed(1)} · 40%: ${g40.toFixed(1)} · 90%: ${g90.toFixed(1)} pro Tick`);
+  ok(`Wachstumskurve: Maximum bei ${(GROWTH_PEAK * 100).toFixed(0)}% des Limits`,
+    GROWTH_PEAK === 0.42 && gPeak > g10 && gPeak > g90,
+    `10%: ${g10.toFixed(2)} · ${(GROWTH_PEAK * 100).toFixed(0)}%: ${gPeak.toFixed(2)} · 90%: ${g90.toFixed(2)} pro Tick`);
+  ok('Wachstum bricht über 80% des Limits deutlich ein', g80 < gPeak * 0.4,
+    `bei 80%: ${(g80 / gPeak * 100).toFixed(0)}% des Maximums`);
   ok('Wachstum = 0 am Truppenlimit', g100 === 0);
+
+  // Das Wachstum haengt an der Kapazitaet: eine Stadt (+25.000) hebt es genauso
+  // stark wie das Limit. Ohne diese Kopplung klebt der Fuellstand bei ~0 und die
+  // Kurve oben wird wirkungslos (so war es vor der Umstellung).
+  p0.territory = 1000; p0.cities = 0;
+  p0.troops = gk.maxTroopsOf(p0) * GROWTH_PEAK;
+  const wLand = gk.troopGrowthOf(p0);
+  p0.cities = 1;
+  p0.troops = gk.maxTroopsOf(p0) * GROWTH_PEAK;
+  const wCity = gk.troopGrowthOf(p0);
+  ok('Eine Stadt hebt das Wachstum so stark wie das Limit', wCity / wLand > 5,
+    `ohne Stadt ${wLand.toFixed(2)} -> mit Stadt ${wCity.toFixed(2)} pro Tick`);
 }
 
 // ---- Spiel 10: Häfen, Handel, Kriegsschiffe, Fabrik & Züge ----
@@ -466,8 +482,10 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('2. Stadt kostet 2x', ge.buildCostOf(0, 'city') === BUILD_COSTS.city * 2);
   p.cities = 3;
   ok('4. Stadt kostet 8x', ge.buildCostOf(0, 'city') === BUILD_COSTS.city * 8);
-  p.cities = 7;
-  ok('Preis-Verdopplung capped bei 8x (3 Verdopplungen)', ge.buildCostOf(0, 'city') === BUILD_COSTS.city * 8);
+  p.cities = 4;
+  ok('5. Stadt kostet 16x (250 -> 4.000 €)', ge.buildCostOf(0, 'city') === BUILD_COSTS.city * 16);
+  p.cities = 9;
+  ok('Stadtpreis capped bei 16x (4 Verdopplungen)', ge.buildCostOf(0, 'city') === BUILD_COSTS.city * 16);
   p.cities = 0;
   p.ports = 1;
   p.factories = 1;
@@ -558,6 +576,39 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   gr.payTrain({ owner: 0 }, foreign);
   ok('Verbündete Station zahlt mehr als eine nicht-verbündete',
     A.money > notAllied && B.money === A.money, `${notAllied} € -> ${A.money} €`);
+}
+
+// ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----
+{
+  const gc = newGame(7);
+  while (gc.phase === 'spawn') gc.turn([]);
+  const p = gc.players[0];
+  p.cities = 0; p.territory = 1000;
+  const base = gc.maxTroopsOf(p);
+  p.territory = 1001;
+  ok('Ein Feld trägt 3 Bevölkerung', gc.maxTroopsOf(p) - base === 3,
+    `+${gc.maxTroopsOf(p) - base} pro Feld`);
+  p.territory = 1000; p.cities = 1;
+  ok('Eine Stadt trägt +25.000 Bevölkerung', gc.maxTroopsOf(p) - base === 25000,
+    `+${gc.maxTroopsOf(p) - base} pro Stadt`);
+
+  // Festung: 5x im Radius 30, kein Stapeln, außerhalb wirkungslos
+  const W = gc.map.w;
+  const home = gc.landCells.find(c => gc.owner[c] === 0);
+  const hx = home % W, hy = (home / W) | 0;
+  const put = (kind, dx, dy) => {
+    const cell = (hy + dy) * W + (hx + dx);
+    const b = { owner: 0, kind, cell };
+    gc.buildings.push(b); gc.buildingAt.set(cell, b);
+    return cell;
+  };
+  const f1 = put('fort', 0, 0);
+  ok('Festung: 5x Verteidigung am Standort', gc.fortBonus(f1, 0) === 5);
+  ok('Festung wirkt im Radius 30', gc.fortBonus(f1 + 29, 0) === 5);
+  ok('Festung wirkt nicht mehr bei 31', gc.fortBonus(f1 + 31, 0) === 1);
+  put('fort', 10, 0); // zweite Festung, Radien überlappen
+  ok('Mehrere Festungen stapeln nicht', gc.fortBonus(f1 + 5, 0) === 5,
+    `Bonus bei zwei überlappenden Festungen: ${gc.fortBonus(f1 + 5, 0)}x`);
 }
 
 console.log(results.join('\n'));
