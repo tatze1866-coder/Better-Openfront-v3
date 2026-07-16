@@ -53,6 +53,7 @@ const DEFENDER_LOSS_PER_CELL = 1.8;  // Verteidiger-Verlust je verlorener Zelle 
 const NEUTRAL_INTERVAL = 3;          // gegen Neutral: Front alle 3 Ticks
 const ENEMY_INTERVAL = 5;            // gegen Spieler: etwas langsamer
 const CLASH_SPEED_CAP = 5;           // Gegenangriffe: max. Beschleunigung der stärkeren Front
+const ATTACK_SPEED_CAP = 4;          // Übermacht: max. Beschleunigung nach Pool/haltende Truppen
 const WIN_FRACTION = 0.7;            // 70% des Landes = Sieg
 
 // Gebäude – werden mit Geld (€) gebaut.
@@ -77,8 +78,8 @@ const TRADE_SPEED = 1.5;             // Wasserzellen pro Tick
 // Handelsgold = BASE + COEF * Weglänge^EXP. Der Exponent > 1 macht lange Routen
 // überproportional lohnend (Vorbild: 10.000 + 150 * d^1,1, auf unsere
 // Geld-Größenordnung heruntergerechnet).
-const TRADE_VALUE_BASE = 40;         // € bei Ankunft (beide Seiten)
-const TRADE_VALUE_COEF = 0.6;        // € je Wegzelle^EXP
+const TRADE_VALUE_BASE = 20;         // € bei Ankunft (beide Seiten) – Häfen bewusst schwächer
+const TRADE_VALUE_COEF = 0.3;        // € je Wegzelle^EXP
 const TRADE_VALUE_EXP = 1.1;         // > 1 = weite Routen zahlen überproportional
 
 // Kriegsschiffe
@@ -103,7 +104,7 @@ const TRAIN_SPEED = 1.4;             // Zellen pro Tick entlang der Schiene
 const TRAIN_VISITS = 6;              // Stationsbesuche, dann endet der Zug
 // Geld je durchfahrener Station. Bei FREMDEN Stationen verdienen beide Seiten
 // (der Zug-Besitzer und der Stationsbesitzer) – Verbündete bringen am meisten.
-const TRAIN_PAY = { own: 6, foreign: 12, ally: 18 };
+const TRAIN_PAY = { own: 12, foreign: 24, ally: 36 };
 
 // Boote
 export const MAX_BOATS = 3;
@@ -1082,16 +1083,21 @@ export class Game {
       // Front rückt im Takt vor (nicht jeden Tick)
       if (--atk.cd > 0) continue;
       let interval = defender ? ENEMY_INTERVAL : NEUTRAL_INTERVAL;
-      // Treffen zwei Angriffe frontal aufeinander (beide greifen sich gegen-
-      // seitig an), rückt die stärkere Front schneller vor: je größer das
-      // Verhältnis der Truppen-Pools, desto kürzer ihr Takt (bis CLASH_SPEED_CAP).
-      // So entscheidet sich ein Schlagabtausch zügig, statt sich hinzuziehen.
+      // Übermacht beschleunigt: je größer der Angriffs-Pool im Verhältnis zu den
+      // haltenden Truppen des Verteidigers, desto kürzer der Takt (bis
+      // ATTACK_SPEED_CAP). Da die Front weiter nur an der Grenze und pro Vorstoß
+      // als geschlossene Linie vorrückt, bilden sich trotzdem Angriffslinien –
+      // ein starker Angriff frisst sie nur schneller ab.
       if (defender) {
+        let speed = Math.min(ATTACK_SPEED_CAP, Math.max(1, atk.pool / Math.max(1, defender.troops)));
+        // Treffen zwei Angriffe frontal aufeinander (beide greifen sich gegen-
+        // seitig an), beschleunigt zusätzlich das Pool-Verhältnis der stärkeren
+        // Front (bis CLASH_SPEED_CAP), damit sich ein Schlagabtausch zügig löst.
         const opp = this.attacks.find(a => a.attacker === atk.target && a.target === atk.attacker && a.pool > 0);
         if (opp && atk.pool > opp.pool) {
-          const speed = Math.min(CLASH_SPEED_CAP, atk.pool / Math.max(1, opp.pool));
-          interval = Math.max(1, Math.round(interval / speed));
+          speed = Math.max(speed, Math.min(CLASH_SPEED_CAP, atk.pool / Math.max(1, opp.pool)));
         }
+        interval = Math.max(1, Math.round(interval / speed));
       }
       atk.cd = interval;
 
