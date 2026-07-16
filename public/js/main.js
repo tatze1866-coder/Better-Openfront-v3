@@ -1279,14 +1279,3 @@ function updateAllyRequests() {
     $('allyRequests').appendChild(card);
     allyReqCards.set(key, card);
   }
-
-  // Karten entfernen, deren Anfrage nicht mehr existiert (angenommen/abgelaufen)
-  for (const [key, card] of allyReqCards) {
-    if (!activeKeys.has(key)) { card.remove(); allyReqCards.delete(key); }
-  }
-}
-
-function removeAllyCard(key) {
-  const card = allyReqCards.get(key);
-  if (card) { card.remove(); allyReqCards.delete(key); }
-}
