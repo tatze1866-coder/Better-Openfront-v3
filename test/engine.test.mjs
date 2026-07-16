@@ -652,6 +652,40 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Andere Gebäude snappen nicht', gp.resolveBuildCell(0, inland, 'city') === inland);
 }
 
+// ---- Spiel 12c: Kämpfende Truppen zählen zur Kapazität + Rückzug ----
+{
+  const ga = newGame(31);
+  while (ga.phase === 'spawn') ga.turn([]);
+  const p = ga.players[0];
+  const max = ga.maxTroopsOf(p);
+
+  // Gleicher Gesamt-Füllstand -> gleiches Wachstum, egal ob die Truppen
+  // daheim stehen oder im Angriff kämpfen
+  p.troops = max * 0.5;
+  const gHome = ga.troopGrowthOf(p);
+  p.troops = max * 0.1;
+  const fake = { attacker: 0, target: -1, pool: max * 0.4, frontier: new Set(), cd: 1e9, stall: 0 };
+  ga.attacks.push(fake);
+  const gOut = ga.troopGrowthOf(p);
+  ok('Kämpfende Truppen zählen zum Füllstand', Math.abs(gHome - gOut) < 1e-9,
+    `daheim ${gHome.toFixed(2)} vs. draußen ${gOut.toFixed(2)} pro Tick`);
+
+  // Belegen die Angriffe die restliche Kapazität, wächst nichts nach
+  fake.pool = max * 0.9;
+  p.troops = max * 0.1;
+  ga.economy();
+  ok('Kein Nachwachsen, wenn Angriffe die Kapazität belegen',
+    Math.abs(p.troops - max * 0.1) < 1e-6, `Truppen ${Math.round(p.troops)} bei Limit ${max}`);
+
+  // Rückzug: Truppen kehren sofort zurück, der Angriff verschwindet
+  const before = p.troops;
+  ga.applyIntent({ p: 0, type: 'retreat', target: -1 });
+  ok('Rückzug bringt die restlichen Truppen sofort zurück',
+    Math.abs(p.troops - (before + max * 0.9)) < 1e-6 && fake.pool === 0);
+  ga.turn([]);
+  ok('Abgebrochener Angriff verschwindet', !ga.attacks.includes(fake));
+}
+
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----
 {
   const gc = newGame(7);

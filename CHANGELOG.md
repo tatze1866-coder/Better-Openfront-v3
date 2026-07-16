@@ -3,6 +3,19 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.10.0] – 2026-07-16
+
+### Geändert
+- **Kämpfende Truppen zählen zur Kapazität**: Truppen in Angriffen und auf
+  Booten belegen weiterhin Platz im Bevölkerungslimit. Wer alles in Angriffe
+  steckt, wächst nicht mehr nebenbei nach, sondern muss warten, bis der
+  Angriff endet. Das orange gestreifte Segment im Truppenbalken zeigt, wie
+  viele Truppen gerade draußen kämpfen.
+
+### Hinzugefügt
+- **Angriffe abbrechen**: Klick auf einen eigenen Angriff in der Liste rechts
+  („Deine Angriffe") holt die restlichen Truppen sofort zurück.
+
 ## [0.9.0] – 2026-07-16
 
 ### Hinzugefügt

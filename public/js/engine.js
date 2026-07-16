@@ -207,6 +207,16 @@ export class Game {
     return p.territory * MAX_PER_TERRITORY + MAX_BASE + p.cities * CITY_MAX_BONUS;
   }
 
+  // Truppen, die gerade "draussen" kaempfen: Angriffs-Pools und Boots-Besatzungen.
+  // Sie zaehlen zur Kapazitaet – wer alles in Angriffe steckt, waechst nicht nach,
+  // sondern muss warten, bis der Angriff endet (oder ihn abbrechen: 'retreat').
+  committedTroopsOf(pIdx) {
+    let sum = 0;
+    for (const a of this.attacks) if (a.attacker === pIdx) sum += a.pool;
+    for (const b of this.boats) if (b.owner === pIdx) sum += b.troops;
+    return sum;
+  }
+
   // Zelle einem neuen Besitzer geben und dabei alle Zaehler mitfuehren:
   // Gebiets-Zaehler beider Spieler, ein evtl. auf der Zelle stehendes Gebaeude
   // (wechselt den Besitzer bzw. verschwindet bei Neutralisierung) und die
@@ -320,6 +330,18 @@ export class Game {
           existing.pool += troops; // Nachschub für die laufende Front
         } else {
           this.attacks.push({ attacker: p.idx, target, pool: troops, frontier: new Set(), cd: 1, stall: 0 });
+        }
+        break;
+      }
+      // Laufenden Angriff abbrechen: die restlichen Truppen kehren sofort zurueck
+      case 'retreat': {
+        if (this.phase !== 'play') return;
+        const target = it.target | 0;
+        for (const a of this.attacks) {
+          if (a.attacker === p.idx && a.target === target && a.pool > 0) {
+            p.troops += a.pool;
+            a.pool = 0;
+          }
         }
         break;
       }
@@ -967,10 +989,11 @@ export class Game {
     this.turnNo++;
   }
 
-  // Truppenwachstum pro Tick: Kurve mit Maximum bei 40% des Limits
+  // Truppenwachstum pro Tick: Kurve mit Maximum bei 40% des Limits.
+  // Kaempfende Truppen (Angriffe/Boote) zaehlen zum Fuellstand dazu.
   troopGrowthOf(p) {
     const max = this.maxTroopsOf(p);
-    const f = p.troops / max;
+    const f = (p.troops + this.committedTroopsOf(p.idx)) / max;
     const curve = f < GROWTH_PEAK
       ? 0.3 + 0.7 * (f / GROWTH_PEAK)
       : Math.max(0, (1 - f) / (1 - GROWTH_PEAK));
@@ -987,7 +1010,11 @@ export class Game {
     for (const p of this.players) {
       if (!p.alive || p.territory === 0) continue;
       const max = this.maxTroopsOf(p);
-      p.troops = Math.min(max, p.troops + this.troopGrowthOf(p));
+      // Kaempfende Truppen belegen Kapazitaet: nachwachsen kann nur, was
+      // inklusive der Truppen "draussen" unter das Limit passt.
+      const cap = Math.max(0, max - this.committedTroopsOf(p.idx));
+      if (p.troops < cap) p.troops = Math.min(cap, p.troops + this.troopGrowthOf(p));
+      else p.troops = Math.min(p.troops, max);
       p.money += MONEY_BASE + p.territory * MONEY_PER_TERRITORY;
     }
   }
@@ -1232,9 +1259,7 @@ export class Game {
     this.botBuild(p, L);
 
     if (p.troops < L.minTroops) return;
-    let committed = 0;
-    for (const a of this.attacks) if (a.attacker === p.idx) committed += a.pool;
-    if (committed > p.troops * 0.8) return;
+    if (this.committedTroopsOf(p.idx) > p.troops * 0.8) return;
 
     // Nachbarn und eigene Inseln ermitteln (voller Scan, nur alle 2,5s pro Bot)
     const neighborOwners = new Set();

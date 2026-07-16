@@ -626,9 +626,12 @@ function updateHud(now) {
     }
   }
 
-  // Truppenbalken: Fuellstand bis zum Limit, Marke beim Wachstums-Maximum
-  const fill = $('troopFill');
-  fill.style.width = me ? Math.max(0, Math.min(100, (me.troops / game.maxTroopsOf(me)) * 100)) + '%' : '0%';
+  // Truppenbalken: Fuellstand bis zum Limit, oranges Segment = Truppen im
+  // Angriff (zaehlen zur Kapazitaet), Marke beim Wachstums-Maximum
+  const max = me ? game.maxTroopsOf(me) : 1;
+  const out = me ? game.committedTroopsOf(myIdx) : 0;
+  $('troopFill').style.width = me ? Math.max(0, Math.min(100, (me.troops / max) * 100)) + '%' : '0%';
+  $('troopOut').style.width = me ? Math.max(0, Math.min(100, (out / max) * 100)) + '%' : '0%';
   $('troopPeak').style.left = (GROWTH_PEAK * 100) + '%';
 
   updateLeaderboard();
@@ -789,6 +792,19 @@ function updateAttackList() {
       n.className = 'atk-n';
       n.textContent = fmt(a.pool);
       row.append(i, dot, nm, n);
+      // Eigene Angriffe lassen sich per Klick abbrechen – die restlichen
+      // Truppen kehren sofort zurück (Intent 'retreat').
+      if (cls === 'atk-out') {
+        row.title = 'Klicken, um den Angriff abzubrechen – Truppen kehren zurück';
+        const x = document.createElement('span');
+        x.className = 'atk-x';
+        x.textContent = '✕';
+        row.append(x);
+        row.addEventListener('click', () => {
+          sendIntent({ type: 'retreat', target: a.target });
+          showToast(`Angriff auf ${other.name} abgebrochen – Truppen kehren zurück.`);
+        });
+      }
       el.appendChild(row);
     }
   };
