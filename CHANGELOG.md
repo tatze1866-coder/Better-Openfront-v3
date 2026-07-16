@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.13.0] – 2026-07-16
+
+### Hinzugefügt
+- **Aufbauzeit für Gebäude**: Neue Gebäude brauchen 5 Sekunden, bis sie
+  wirken – Städte geben solange keine Kapazität, Festungen keinen Schutz,
+  Häfen keinen Handel/Kriegsschiffe, Fabriken keine Züge. Auf der Karte
+  erscheinen sie halbtransparent mit Fortschrittsbalken. Der Preis zählt
+  sofort; wird ein Gebäude im Aufbau erobert, läuft die Bauzeit weiter.
+
 ## [0.12.1] – 2026-07-16
 
 ### Geändert

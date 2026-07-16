@@ -58,6 +58,7 @@ for (let c = 0; c < g.owner.length; c++) {
 }
 g.turn([{ p: 0, type: 'build', kind: 'fort', cell: fortCell }]);
 ok('Festung gebaut', g.players[0].forts === 1);
+for (let i = 0; i < 50; i++) g.turn([]); // Aufbauzeit (5s) abwarten
 ok('Festungs-Bonus wirkt (5x)', g.fortBonus(fortCell, 0) === 5 && g.fortBonus(myCell, 0) >= 1);
 
 // Boot auf fremde Insel
@@ -754,6 +755,38 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Ungültiger Wunsch -> Automatik', /^#[0-9a-f]{6}$/.test(colors[0]));
   ok('Keine zwei Spieler teilen sich eine Farbe', new Set(colors).size === colors.length,
     colors.join(' '));
+}
+
+// ---- Spiel 12f: Aufbauzeit (5s) für Gebäude ----
+{
+  const gb = newGame(61);
+  while (gb.phase === 'spawn') gb.turn([]);
+  const p = gb.players[0];
+  p.money = 100000;
+  const own = gb.landCells.find(c => gb.owner[c] === 0);
+  // Stadt: zählt sofort für den Preis, aber erst nach 5s zur Kapazität
+  const bonusOf = () => gb.maxTroopsOf(p) - p.territory * 3 - 1000;
+  gb.applyIntent({ p: 0, type: 'build', kind: 'city', cell: own });
+  ok('Stadt im Aufbau: noch keine Kapazität', p.cities === 1 && bonusOf() === 0,
+    `Bonus ${bonusOf()}`);
+  const cityB = gb.buildingAt.get(own);
+  ok('Frisch gebaut = im Aufbau', gb.underConstruction(cityB));
+  for (let i = 0; i < 50; i++) gb.turn([]);
+  ok('Nach 5s: Stadt voll wirksam', !gb.underConstruction(cityB) && bonusOf() === 25000,
+    `Bonus ${bonusOf()}`);
+
+  // Festung: schützt erst nach der Aufbauzeit. Bauplatz weit genug weg von
+  // der Stadt liegt evtl. außerhalb des Startgebiets -> Zelle direkt zuweisen.
+  let fortCell = -1;
+  for (const c of gb.landCells) {
+    if (gb.dist2(c, own) > 400) { fortCell = c; break; }
+  }
+  gb.setOwner(fortCell, 0);
+  ok('Festungs-Bauplatz gefunden', gb.canBuildAt(0, fortCell, 'fort') === null);
+  gb.applyIntent({ p: 0, type: 'build', kind: 'fort', cell: fortCell });
+  ok('Festung im Aufbau schützt nicht', gb.fortBonus(fortCell, 0) === 1);
+  for (let i = 0; i < 50; i++) gb.turn([]);
+  ok('Festung nach 5s: 5x Verteidigung', gb.fortBonus(fortCell, 0) === 5);
 }
 
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----

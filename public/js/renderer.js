@@ -6,7 +6,7 @@
 // EIN Bild hochskaliert. So muss pro Frame nicht jede Zelle einzeln gezeichnet
 // werden; geaendert wird nur, was sich wirklich veraendert hat (markDirty).
 
-import { FACTORY_RADIUS } from './engine.js';
+import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS } from './engine.js';
 import { hash2 } from './rng.js';
 
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
@@ -446,6 +446,9 @@ export class Renderer {
     for (const b of g.buildings) {
       const x = cx(b.cell), y = cy(b.cell);
       const col = b.owner >= 0 ? g.players[b.owner].color : '#888';
+      // Im Aufbau: Icon halbtransparent, darunter ein kleiner Fortschrittsbalken
+      const deploying = g.underConstruction(b);
+      if (deploying) ctx.globalAlpha = 0.45;
       if (b.kind === 'city') {
         // Haeuserzeile: drei unterschiedlich hohe Haeuser
         ctx.fillStyle = '#ffffff';
@@ -494,7 +497,16 @@ export class Renderer {
         ctx.fillRect(x - 2.1, y - 1.1, 4.2, 3.1);       // Halle
         ctx.fillRect(x + 1.05, y - 3, 1.1, 1.9);        // Schornstein
       }
+      if (deploying) {
+        const t = Math.min(1, (g.turnNo - b.built) / BUILD_DEPLOY_TICKS);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillRect(x - 3, y + 3.4, 6, 1);
+        ctx.fillStyle = '#ffd60a';
+        ctx.fillRect(x - 3, y + 3.4, 6 * t, 1);
+      }
     }
+    ctx.globalAlpha = 1;
 
     // Züge auf den Schienen
     for (const tr of g.trains) {

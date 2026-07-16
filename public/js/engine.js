@@ -70,6 +70,7 @@ const FORT_RADIUS2 = 900;            // Festung schützt im Radius 30
 const FORT_DEFENSE = 5;              // Eroberung dort 5x so teuer (stapelt nicht)
 const MIN_BUILD_DIST2 = 100;         // Mindestabstand 10 zwischen eigenen Gebäuden
 const PORT_SNAP_RADIUS = 8;          // Hafen-Klick springt bis zu 8 Zellen zur Küste
+export const BUILD_DEPLOY_TICKS = 50; // 5s Aufbauzeit: Gebäude wirken erst danach
 
 // Häfen & Handel
 const TRADE_INTERVAL = 100;          // Hafen versucht alle 10s ein Handelsschiff
@@ -256,9 +257,22 @@ export class Game {
   allianceKey(a, b) { return a < b ? `${a}:${b}` : `${b}:${a}`; }
   isAllied(a, b) { return this.alliances.has(this.allianceKey(a, b)); }
 
+  // Ist das Gebaeude noch im Aufbau? Frisch gebaute Gebaeude wirken erst nach
+  // BUILD_DEPLOY_TICKS (5s). Gebaeude ohne built-Zeitstempel (z.B. direkt in
+  // Tests erzeugt) gelten sofort als fertig. Wechselt ein Gebaeude im Aufbau
+  // den Besitzer, laeuft die Bauzeit einfach weiter.
+  underConstruction(b) {
+    return b.built !== undefined && this.turnNo - b.built < BUILD_DEPLOY_TICKS;
+  }
+
   // Truppen-Obergrenze eines Spielers: waechst mit Gebiet und Staedten.
+  // Staedte im Aufbau zaehlen noch nicht.
   maxTroopsOf(p) {
-    return p.territory * MAX_PER_TERRITORY + MAX_BASE + p.cities * CITY_MAX_BONUS;
+    let cities = p.cities;
+    for (const b of this.buildings) {
+      if (b.kind === 'city' && b.owner === p.idx && this.underConstruction(b)) cities--;
+    }
+    return p.territory * MAX_PER_TERRITORY + MAX_BASE + cities * CITY_MAX_BONUS;
   }
 
   // Truppen, die gerade "draussen" kaempfen: Angriffs-Pools und Boots-Besatzungen.
@@ -426,7 +440,9 @@ export class Game {
         const c = this.resolveBuildCell(p.idx, it.cell | 0, kind);
         if (this.canBuildAt(p.idx, c, kind) !== null) return;
         p.money -= this.buildCostOf(p.idx, kind);
-        const b = { owner: p.idx, kind, cell: c };
+        // built = Bauzeitpunkt: das Gebäude ist erst nach BUILD_DEPLOY_TICKS
+        // wirksam (siehe underConstruction). Preiszähler zählen sofort.
+        const b = { owner: p.idx, kind, cell: c, built: this.turnNo };
         this.buildings.push(b);
         this.buildingAt.set(c, b);
         p[KIND_FIELD[kind]]++;
@@ -438,6 +454,7 @@ export class Game {
         const c = it.cell | 0;
         const b = this.buildingAt.get(c);
         if (!b || b.kind !== 'port' || b.owner !== p.idx) return;
+        if (this.underConstruction(b)) return; // Hafen erst nach der Aufbauzeit nutzbar
         if (p.money < WARSHIP_COST) return;
         if (this.warships.filter(w => w.owner === p.idx).length >= p.ports * 2) return;
         // Startzelle: Wasser neben dem Hafen
@@ -569,7 +586,8 @@ export class Game {
   fortBonus(cell, defIdx) {
     if (defIdx < 0) return 1;
     for (const b of this.buildings) {
-      if (b.kind === 'fort' && b.owner === defIdx && this.dist2(b.cell, cell) <= FORT_RADIUS2) return FORT_DEFENSE;
+      if (b.kind === 'fort' && b.owner === defIdx && !this.underConstruction(b) &&
+          this.dist2(b.cell, cell) <= FORT_RADIUS2) return FORT_DEFENSE;
     }
     return 1;
   }
@@ -718,11 +736,12 @@ export class Game {
   processTrade() {
     // Häfen schicken Handelsschiffe zu fremden Häfen
     for (const b of this.buildings) {
-      if (b.kind !== 'port' || !this.players[b.owner].alive) continue;
+      if (b.kind !== 'port' || !this.players[b.owner].alive || this.underConstruction(b)) continue;
       if ((this.turnNo + b.cell) % TRADE_INTERVAL !== 0) continue;
       const own = this.tradeShips.filter(s => s.owner === b.owner).length;
       if (own >= this.players[b.owner].ports * TRADE_CAP_PER_PORT) continue;
-      const targets = this.buildings.filter(x => x.kind === 'port' && x.owner !== b.owner && this.players[x.owner].alive);
+      const targets = this.buildings.filter(x => x.kind === 'port' && x.owner !== b.owner &&
+        this.players[x.owner].alive && !this.underConstruction(x));
       if (!targets.length) continue;
       for (let t = 0; t < 3; t++) {
         const target = targets[(this.rng() * targets.length) | 0];
@@ -871,7 +890,8 @@ export class Game {
   // die ihre Zuege anfahren koennen.
   factoryStations(factory) {
     return this.buildings.filter(b =>
-      (b.kind === 'city' || b.kind === 'port') && this.dist2(b.cell, factory.cell) <= FACTORY_RADIUS2);
+      (b.kind === 'city' || b.kind === 'port') && !this.underConstruction(b) &&
+      this.dist2(b.cell, factory.cell) <= FACTORY_RADIUS2);
   }
 
   // Schienennetz-Graph neu aufbauen (einmal pro Runde, siehe turn()).
@@ -899,13 +919,14 @@ export class Game {
       edges.push([a, b]);
     };
     for (const f of this.buildings) {
-      if (f.kind !== 'factory') continue;
+      if (f.kind !== 'factory' || this.underConstruction(f)) continue;
       // Knoten dieses Netzes: die Fabrik selbst, jede Station in ihrem Radius
       // und andere Fabriken in Reichweite. Fabriken zahlen nichts, wenn ein Zug
       // durchfaehrt (payTrain gilt nur fuer Staedte/Haefen) – sie verbinden nur.
       const nodes = [f.cell, ...this.factoryStations(f).map(s => s.cell)];
       for (const o of this.buildings) {
-        if (o.kind === 'factory' && o !== f && this.dist2(o.cell, f.cell) <= FACTORY_RADIUS2) {
+        if (o.kind === 'factory' && o !== f && !this.underConstruction(o) &&
+            this.dist2(o.cell, f.cell) <= FACTORY_RADIUS2) {
           nodes.push(o.cell);
         }
       }
