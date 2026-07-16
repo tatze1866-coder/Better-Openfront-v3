@@ -855,3 +855,190 @@ button.primary:hover { background: #f4845f; }
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* =========================================================================
+   EINSTELLUNGS-DIALOG (Settings Modal)
+   ========================================================================= */
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 12, 20, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(3px);
+  animation: settingsFadeIn 0.18s ease;
+}
+.settings-overlay.hidden { display: none !important; }
+
+@keyframes settingsFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.settings-dialog {
+  position: relative;
+  width: min(420px, 92vw);
+  background: linear-gradient(180deg, rgba(12, 22, 33, 0.97), rgba(10, 18, 27, 0.99));
+  border: 1px solid #d4af6a;
+  border-radius: 6px;
+  outline: 5px solid rgba(9, 16, 24, 0.55);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 6px #6b5423,
+    0 0 0 7px #d4af6a,
+    0 20px 60px rgba(0, 0, 0, 0.7);
+  padding: 28px 32px 24px;
+  animation: settingsSlideIn 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes settingsSlideIn {
+  from { transform: translateY(-18px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(212, 175, 106, 0.35);
+}
+
+.settings-header h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #d4af6a;
+  margin: 0;
+  padding: 0;
+}
+.settings-header h2::after { display: none; }
+
+.settings-close {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  font-size: 16px !important;
+  font-weight: 700;
+  color: #c9b98a !important;
+  background: rgba(107, 84, 35, 0.25) !important;
+  border: 1px solid #6b5423 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.settings-close:hover {
+  background: rgba(212, 175, 106, 0.25) !important;
+  border-color: #d4af6a !important;
+  color: #f0d68a !important;
+}
+
+.settings-section {
+  margin-bottom: 20px;
+}
+
+.settings-label {
+  display: block;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  color: #c9b98a;
+  margin-bottom: 9px;
+  letter-spacing: 0.5px;
+}
+
+/* Sprach-Segment im Dialog */
+.settings-lang-seg button {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 1px;
+  font-size: 13px;
+  background: linear-gradient(180deg, #24405f, #16283c);
+  border: 1px solid #6b5423;
+  color: #e8dcb8;
+  border-radius: 5px;
+  padding: 9px 12px;
+  margin-top: 0;
+  flex: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.settings-lang-seg button:hover {
+  background: linear-gradient(180deg, #2c4d70, #1c3450);
+  border-color: #d4af6a;
+}
+.settings-lang-seg button.sel {
+  background: linear-gradient(180deg, #2f6198, #173a5c);
+  border-color: #d4af6a;
+  color: #f0e6c8;
+  box-shadow: 0 0 0 2px rgba(212, 175, 106, 0.35);
+}
+
+/* Lautstärke-Zeile */
+.settings-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.settings-volume-row input[type="range"] {
+  flex: 1;
+  accent-color: #d4af6a;
+}
+.settings-vol-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.settings-volume-row b {
+  font-family: 'Cinzel', serif;
+  color: #f0d68a;
+  font-size: 14px;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* Schließen-Button unten */
+.settings-close-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 2px;
+  font-size: 14px;
+  background: linear-gradient(180deg, #2f6198, #173a5c);
+  border: 1px solid #d4af6a;
+  color: #f0e6c8;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: background 0.15s;
+}
+.settings-close-btn:hover {
+  background: linear-gradient(180deg, #3a75b5, #1d4a73);
+}
+
+/* FPS-Anzeige im Spiel */
+#fpsDisplay {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-left: 120px;
+  background: rgba(22, 40, 60, 0.75);
+  border: 1px solid #35547a;
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #f4a261;
+  pointer-events: none;
+  z-index: 5;
+}
