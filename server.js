@@ -212,7 +212,11 @@ function handleMessage(ws, m) {
       // Einheiten-ID fuer 'warship_move' / 'catapult_move' (Feldname muss zu engine.js passen)
       if (typeof d.ship === 'number') intent.ship = d.ship | 0;
       if (typeof d.kind === 'string') {
-        intent.kind = ['city', 'fort', 'port', 'factory'].includes(d.kind) ? d.kind : 'city';
+        intent.kind = ['city', 'fort', 'port', 'factory', 'tower'].includes(d.kind) ? d.kind : 'city';
+      }
+      // Munitionsart fuer 'tower_shoot' (Feldname muss zu engine.js passen)
+      if (typeof d.ammo === 'string') {
+        intent.ammo = ['stone', 'arrow', 'fire'].includes(d.ammo) ? d.ammo : 'stone';
       }
       room.pending.push(intent);
       break;

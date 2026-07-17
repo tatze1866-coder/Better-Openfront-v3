@@ -6,7 +6,7 @@
 // EIN Bild hochskaliert. So muss pro Frame nicht jede Zelle einzeln gezeichnet
 // werden; geaendert wird nur, was sich wirklich veraendert hat (markDirty).
 
-import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS, FORT_RADIUS, CATAPULT_RANGE, FORT_HP } from './engine.js';
+import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS, FORT_RADIUS, CATAPULT_RANGE, FORT_HP, TOWER_RANGE, TOWER_AMMO, TOWER_BUILDING_HP } from './engine.js';
 import { hash2 } from './rng.js';
 
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
@@ -75,6 +75,7 @@ export class Renderer {
     this.myIdx = -1;
     this.factoryHint = false;
     this.fortHint = false;      // Festungs-Baumodus: Radius-Ringe deutlicher + Vorschau
+    this.towerAim = null;       // { cell, ammo } waehrend ein eigener Turm zielt (main.js setzt das)
     this.buildingStyle = 'orig'; // 'orig' = Emoji/Formen, 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
     this.animations = true;   // von main.js gesetzt (Einstellung "Animationen")
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
@@ -616,6 +617,29 @@ export class Renderer {
       ctx.restore();
     }
 
+    // Turm im Zielmodus (main.js setzt this.towerAim = { cell, ammo }, wenn
+    // ein eigener Turm zum Schuss ausgewaehlt ist): Reichweitenring in Gold
+    // um den Turm, plus Aufschlagsradius der gewaehlten Munition am Cursor.
+    if (this.towerAim) {
+      const { cell: tc, ammo } = this.towerAim;
+      ctx.save();
+      ctx.setLineDash([2.5, 2.5]);
+      ctx.lineWidth = 0.9;
+      ctx.strokeStyle = 'rgba(255, 214, 10, 0.85)';
+      ctx.beginPath();
+      ctx.arc(cx(tc), cy(tc), TOWER_RANGE, 0, Math.PI * 2);
+      ctx.stroke();
+      if (this.hoverCell >= 0) {
+        const cfg = TOWER_AMMO[ammo] || TOWER_AMMO.stone;
+        ctx.setLineDash([]);
+        ctx.fillStyle = ammo === 'fire' ? 'rgba(230, 57, 70, 0.28)' : 'rgba(255, 214, 10, 0.22)';
+        ctx.beginPath();
+        ctx.arc(cx(this.hoverCell), cy(this.hoverCell), cfg.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Trümmerfelder zerstörter Festungen: dunkler Schutt-Haufen
     for (const r of g.ruins) {
       const x = cx(r.cell), y = cy(r.cell);
@@ -694,6 +718,25 @@ export class Renderer {
           ctx.fillStyle = col;
           ctx.fillRect(x - 2.1, y - 1.1, 4.2, 3.1);
           ctx.fillRect(x + 1.05, y - 3, 1.1, 1.9);
+        } else if (b.kind === 'tower') {
+          // Wachturm: schmaler Schaft mit spitzem Dach, wie Festung/Stadt in
+          // Weiss als Kontrastrahmen und darin kleiner in Spielerfarbe.
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 1.7, y - 1, 3.4, 4.4);
+          ctx.beginPath();
+          ctx.moveTo(x - 2.2, y - 1);
+          ctx.lineTo(x, y - 3.8);
+          ctx.lineTo(x + 2.2, y - 1);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = col;
+          ctx.fillRect(x - 1.05, y - 0.4, 2.1, 3.3);
+          ctx.beginPath();
+          ctx.moveTo(x - 1.6, y - 1);
+          ctx.lineTo(x, y - 3.1);
+          ctx.lineTo(x + 1.6, y - 1);
+          ctx.closePath();
+          ctx.fill();
         }
       } else {
         // Besitzer-Ring als Kontrast-/Farbtraeger hinter dem Badge
@@ -721,9 +764,15 @@ export class Renderer {
         ctx.fillStyle = '#ffd60a';
         ctx.fillRect(x - 3, y + 3.4, 6 * t, 1);
       }
-      // Beschädigte Festung (von Katapult beschossen): kleiner Lebensbalken
+      // Beschädigte Festung (von Katapult/Turm beschossen): kleiner Lebensbalken
       if (b.kind === 'fort' && b.hp !== undefined && b.hp < FORT_HP) {
         const frac = Math.max(0, b.hp / FORT_HP);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(x - 3, y - 4.6, 6, 0.9);
+        ctx.fillStyle = frac > 0.5 ? '#38b000' : '#e63946';
+        ctx.fillRect(x - 3, y - 4.6, 6 * frac, 0.9);
+      } else if (b.kind !== 'fort' && b.dmg) {
+        const frac = Math.max(0, 1 - b.dmg / TOWER_BUILDING_HP);
         ctx.fillStyle = '#222';
         ctx.fillRect(x - 3, y - 4.6, 6, 0.9);
         ctx.fillStyle = frac > 0.5 ? '#38b000' : '#e63946';

@@ -249,6 +249,7 @@
           <span title="Festungen">🛡 <b id="cntFort">0</b></span>
           <span title="Häfen">⚓ <b id="cntPort">0</b></span>
           <span title="Fabriken">🏭 <b id="cntFactory">0</b></span>
+          <span title="Türme">🗼 <b id="cntTower">0</b></span>
         </div>
       </div>
       <!-- Truppenbalken: Füllstand bis zum Limit, oranges Segment = Truppen im
@@ -263,6 +264,16 @@
         <button id="btnFort"><img class="build-icon" src="images/buildings/fort.png" alt=""> Festung</button>
         <button id="btnPort"><img class="build-icon" src="images/buildings/port.png" alt=""> Hafen</button>
         <button id="btnFactory"><img class="build-icon" src="images/buildings/factory.png" alt=""> Fabrik</button>
+        <button id="btnTower">🗼 Turm</button>
+      </div>
+      <!-- Turm-Zielmodus: erscheint, sobald ein eigener Turm angeklickt wurde.
+           Munition waehlen, dann Zielzelle in Reichweite anklicken. -->
+      <div id="towerPanel" class="hidden">
+        <span id="towerPanelLabel">Turm: Munition wählen</span>
+        <button id="btnAmmoStone" class="ammo-btn">🪨 Stein</button>
+        <button id="btnAmmoArrow" class="ammo-btn">🏹 Pfeil</button>
+        <button id="btnAmmoFire" class="ammo-btn">🔥 Feuerpfeil</button>
+        <button id="btnAmmoCancel">✕</button>
       </div>
       <div class="hint">Klick = Angriff · andere Insel = Boot · Rechtsklick = Menü (Bauen, Kriegsschiff, Allianz)</div>
     </div>
@@ -277,9 +288,10 @@
       <ul id="shList">
         <li><b>WASD</b> / Pfeile – Kamera bewegen</li>
         <li><b>Mausrad</b> – Zoom · <b>Minimap</b> – springen</li>
-        <li><b>1</b> Stadt · <b>2</b> Festung · <b>3</b> Hafen · <b>4</b> Fabrik</li>
+        <li><b>1</b> Stadt · <b>2</b> Festung · <b>3</b> Hafen · <b>4</b> Fabrik · <b>5</b> Turm</li>
         <li><b>Linksklick</b> – angreifen / ausbreiten</li>
         <li><b>Rechtsklick</b> – Menü (Allianz, Boot, Bauen)</li>
+        <li>Turm anklicken – Munition wählen, Ziel anklicken</li>
         <li><b>Esc</b> – Modus / Menü abbrechen</li>
       </ul>
     </div>

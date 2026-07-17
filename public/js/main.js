@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK, TOWER_AMMO, TOWER_RANGE } from './engine.js';
 import { Renderer } from './renderer.js';
 import { getLang, setLang, applyStaticTranslations, onLangChange, t } from './i18n.js';
 import * as Achievements from './achievements.js';
@@ -128,9 +128,10 @@ document.addEventListener('keydown', e => {
     closeIconPicker();
   } else if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
     closeProfile();
-  } else if (e.key === 'Escape' && (selectedWarships.size || selectedCatapults.size)) {
+  } else if (e.key === 'Escape' && (selectedWarships.size || selectedCatapults.size || selectedTower !== null)) {
     clearWarshipSelection(); // Kriegsschiff-Auswahl aufheben
     clearCatapultSelection(); // Katapult-Auswahl aufheben
+    clearTowerSelection(); // Turm-Zielmodus verlassen
   }
 });
 
@@ -785,6 +786,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   $('eventFeed').innerHTML = ''; // Feed gehört zum alten Spiel
   clearWarshipSelection();       // Kriegsschiff-Auswahl gehört auch dazu
   clearCatapultSelection();      // Katapult-Auswahl ebenso
+  clearTowerSelection();         // Turm-Zielmodus ebenso
   $('attackList').classList.add('hidden');
   // Allianz-Anfrage-Karten gehören auch zum alten Spiel -> entfernen
   for (const card of allyReqCards.values()) card.remove();
@@ -925,9 +927,10 @@ const BUILD_KINDS = [
   { kind: 'fort', btn: 'btnFort', label: 'Festung', key: '2' },
   { kind: 'port', btn: 'btnPort', label: 'Hafen', key: '3' },
   { kind: 'factory', btn: 'btnFactory', label: 'Fabrik', key: '4' },
+  { kind: 'tower', btn: 'btnTower', label: 'Turm', key: '5' },
 ];
-const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik' };
-const KIND_EMOJI = { city: '🏙', fort: '🛡', port: '⚓', factory: '🏭' };
+const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik', tower: 'Turm' };
+const KIND_EMOJI = { city: '🏙', fort: '🛡', port: '⚓', factory: '🏭', tower: '🗼' };
 
 // Bildpfad je nach gewähltem Gebäude-Grafikstil: 'v1' = altes Wappen-Set,
 // 'v2' = neues Insel-Set. Für 'orig' (Emoji, Default) wird diese Funktion
@@ -955,7 +958,8 @@ function updateBuildButtons() {
   if (renderer) renderer.fortHint = buildMode === 'fort';
 }
 function buildBtnHtml(bk, cost) {
-  if (settings.buildingStyle === 'orig') {
+  // Für den Turm existiert kein Wappen-/Insel-Grafiksatz (v1/v2) – immer Emoji.
+  if (settings.buildingStyle === 'orig' || bk.kind === 'tower') {
     return `${KIND_EMOJI[bk.kind]} ${bk.label} (${cost}€)`;
   }
   return `<img class="build-icon" src="${iconPath(bk.kind)}" alt="">${bk.label} (${cost}€)`;
@@ -1153,6 +1157,9 @@ function showFeedEvents() {
       } else if (e.by >= 0 && e.p >= 0) {
         pushFeed(t('feedFortOther', { by: nm(e.by), name: nm(e.p) }), false);
       }
+    } else if (e.t === 'towerShot' && e.p === myIdx && e.by !== myIdx) {
+      const what = e.ammo === 'fire' ? 'Feuerpfeile' : (e.ammo === 'arrow' ? 'Pfeile' : 'Steine');
+      pushFeed(`🏹 ${nm(e.by)} beschießt dich mit ${what} aus einem Turm!`, true);
     }
   }
 }
@@ -1200,6 +1207,7 @@ function updateHud(now) {
   $('cntFort').textContent = me ? me.forts : 0;
   $('cntPort').textContent = me ? me.ports : 0;
   $('cntFactory').textContent = me ? me.factories : 0;
+  $('cntTower').textContent = me ? me.towers : 0;
   updateBuildPrices();
 
   const phaseEl = $('phaseInfo');
@@ -1334,7 +1342,7 @@ function updateLbTip() {
 
   const builds = document.createElement('div');
   builds.className = 'tip-builds';
-  for (const [ico, n] of [['🏙', p.cities], ['🛡', p.forts], ['⚓', p.ports], ['🏭', p.factories]]) {
+  for (const [ico, n] of [['🏙', p.cities], ['🛡', p.forts], ['⚓', p.ports], ['🏭', p.factories], ['🗼', p.towers]]) {
     const s = document.createElement('span');
     s.textContent = ico + ' ';
     const b = document.createElement('b');
@@ -1554,6 +1562,51 @@ function clearCatapultSelection() {
   setCatapultSelection([]);
 }
 
+// Turm-Zielmodus: ein eigener, fertig gebauter Turm wird angeklickt,
+// dann Munition gewählt (Stein/Pfeil/Feuerpfeil) und eine Zielzelle in
+// Reichweite angeklickt, um zu feuern. Anders als Katapulte bewegt sich
+// der Turm nicht – 'selectedTower' ist die Zelle des Turms, nicht bloß
+// eine ID.
+let selectedTower = null; // Zelle des ausgewählten eigenen Turms, sonst null
+let towerAmmo = 'stone';  // zuletzt gewählte Munition
+
+function updateTowerPanel() {
+  const panel = $('towerPanel');
+  panel.classList.toggle('hidden', selectedTower === null);
+  for (const [btn, ammo] of [['btnAmmoStone', 'stone'], ['btnAmmoArrow', 'arrow'], ['btnAmmoFire', 'fire']]) {
+    $(btn).classList.toggle('ammo-active', towerAmmo === ammo);
+  }
+  if (renderer) renderer.towerAim = selectedTower === null ? null : { cell: selectedTower, ammo: towerAmmo };
+}
+
+function selectTower(cell) {
+  selectedTower = cell;
+  updateTowerPanel();
+}
+
+function clearTowerSelection() {
+  selectedTower = null;
+  updateTowerPanel();
+}
+
+for (const [btn, ammo] of [['btnAmmoStone', 'stone'], ['btnAmmoArrow', 'arrow'], ['btnAmmoFire', 'fire']]) {
+  $(btn).addEventListener('click', () => { towerAmmo = ammo; updateTowerPanel(); });
+}
+$('btnAmmoCancel').addEventListener('click', () => clearTowerSelection());
+
+// Eigener, fertig gebauter Turm nahe der Klickzelle (großzügiger Fangradius,
+// wie bei Katapulten/Kriegsschiffen)
+function ownTowerAt(cell) {
+  if (cell < 0 || !game) return null;
+  let best = null, bestD = Infinity;
+  for (const b of game.buildings) {
+    if (b.kind !== 'tower' || b.owner !== myIdx || game.underConstruction(b)) continue;
+    const d = game.dist2(b.cell, cell);
+    if (d <= 9 && d < bestD) { bestD = d; best = b; }
+  }
+  return best;
+}
+
 // Shift-Auswahlrechteck in Bildschirmkoordinaten (null = keins aktiv)
 let selectRect = null;
 
@@ -1683,6 +1736,28 @@ canvas.addEventListener('pointerup', e => {
         return;
       }
       clearCatapultSelection(); // Klick ins Wasser: Auswahl aufheben, normal weiter
+    }
+    // Turm-Steuerung: eigenen Turm anklicken -> Munition wählen (Panel),
+    // dann eine Zielzelle in Reichweite anklicken, um zu feuern.
+    const tw = ownTowerAt(cell);
+    if (tw) {
+      selectTower(tw.cell === selectedTower ? null : tw.cell);
+      if (selectedTower !== null) showToast('Turm ausgewählt – Munition wählen, dann Ziel anklicken. 🗼');
+      return;
+    }
+    if (selectedTower !== null) {
+      if (cell >= 0 && game.map.terrain[cell] === 1 && game.dist2(selectedTower, cell) <= TOWER_RANGE * TOWER_RANGE) {
+        const cfg = TOWER_AMMO[towerAmmo];
+        const meP = game.players[myIdx];
+        if (!meP || meP.money < cfg.cost) {
+          showToast(`Nicht genug Geld (${cfg.cost} € nötig).`);
+        } else {
+          sendIntent({ type: 'tower_shoot', cell: selectedTower, ammo: towerAmmo, target: cell });
+          showToast('Turm feuert! 🏹');
+        }
+        return;
+      }
+      clearTowerSelection(); // Klick außer Reichweite: Auswahl aufheben, normal weiter
     }
   }
 

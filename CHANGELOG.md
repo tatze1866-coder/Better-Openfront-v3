@@ -3,6 +3,24 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Hinzugefügt
+- **Neues Gebäude: Turm** 🗼 – stationäres Verteidigungs-/Angriffsgebäude
+  (350 €, Reichweite 14 Zellen, wie eine Festung auf eigenem Gebiet baubar).
+  Anklicken wählt den Turm aus, dann Munition wählen und eine Zielzelle in
+  Reichweite anklicken, um zu feuern:
+  - 🪨 **Stein** – billig (15 €), kleiner Aufschlagsradius, beschädigt nur
+    gegnerische Gebäude im Umkreis (Trefferpunkte, wie beim Katapult).
+  - 🏹 **Pfeil** – teurer (40 €), größerer Aufschlagsradius, sonst wie Stein.
+  - 🔥 **Feuerpfeil** – teuerste Munition (90 €), setzt getroffenes
+    Gegnerland in Brand statt Gebäude zu beschädigen: die Zellen werden
+    neutral und hinterlassen ein Trümmerfeld – die Rückeroberung kostet dort
+    doppelt so viele Truppen (nutzt dieselbe Ruinen-Mechanik wie zerstörte
+    Festungen). Eigenes/verbündetes Land bleibt verschont.
+  Jede Munitionsart hat ihre eigene Nachladezeit; der Turm zeigt seine
+  Reichweite und die Aufschlagsfläche der gewählten Munition am Cursor.
+
 ## [0.17.0] – 2026-07-17
 
 ### Hinzugefügt

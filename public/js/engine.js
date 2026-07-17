@@ -66,10 +66,10 @@ const WIN_FRACTION = 0.7;            // 70% des Landes = Sieg
 // Städte gehen eine Stufe weiter (250 → 500 → 1.000 → 2.000 → 4.000): sie sind
 // mit +25.000 Bevölkerung die stärkste Einzelinvestition und sollen sich nicht
 // beliebig stapeln lassen. Häfen und Fabriken teilen sich dabei einen Zähler.
-export const BUILD_COSTS = { city: 250, fort: 300, port: 400, factory: 600 };
-const COST_DOUBLINGS_CAP = { city: 4, fort: 3, port: 3, factory: 3 };
+export const BUILD_COSTS = { city: 250, fort: 300, port: 400, factory: 600, tower: 350 };
+const COST_DOUBLINGS_CAP = { city: 4, fort: 3, port: 3, factory: 3, tower: 3 };
 export const WARSHIP_COST = 300;
-const KIND_FIELD = { city: 'cities', fort: 'forts', port: 'ports', factory: 'factories' };
+const KIND_FIELD = { city: 'cities', fort: 'forts', port: 'ports', factory: 'factories', tower: 'towers' };
 const CITY_MAX_BONUS = 25000;        // Stadt: +max. Truppen (wichtigstes Gebäude)
 export const FORT_RADIUS = 30;       // Schutzradius einer Festung in Zellen
 const FORT_RADIUS2 = FORT_RADIUS * FORT_RADIUS;
@@ -126,6 +126,24 @@ export const CATAPULT_RANGE = 8;     // Schussweite gegen Festungen
 const CATAPULT_RANGE2 = CATAPULT_RANGE * CATAPULT_RANGE;
 const CATAPULT_SHOT_CD = 15;         // Ticks zwischen Schüssen
 const CATAPULT_SEEK_R2 = 1600;       // sucht selbständig Festungen im Radius 40
+
+// Türme (stationäres Gebäude, feuert auf Befehl auf eine Zielzelle in
+// Reichweite). Drei Munitionsarten – der Spieler wählt beim Schuss:
+//  - stone (Stein): billig, kleiner Radius, beschädigt nur gegnerische
+//    Gebäude (Trefferpunkte, wie Katapulte gegen Festungen).
+//  - arrow (Pfeil): teurer, größerer Radius, sonst wie Stein.
+//  - fire  (Feuerpfeil): teuerste Munition, setzt das getroffene Land in
+//    Brand statt Gebäude zu beschädigen: betroffene gegnerische Zellen
+//    werden neutral und hinterlassen ein Trümmerfeld (siehe ruinMult) –
+//    die Rückeroberung kostet dort RUIN_COST-mal so viele Truppen.
+export const TOWER_RANGE = 14;       // Schussweite des Turms
+const TOWER_RANGE2 = TOWER_RANGE * TOWER_RANGE;
+export const TOWER_BUILDING_HP = 2;         // Nicht-Festungsgebäude: Treffer bis zur Zerstörung
+export const TOWER_AMMO = {
+  stone: { cost: 15, radius: 2, reload: 10 },
+  arrow: { cost: 40, radius: 4, reload: 20 },
+  fire:  { cost: 90, radius: 3, reload: 40 },
+};
 
 // Boote
 export const MAX_BOATS = 3;
@@ -257,6 +275,7 @@ export class Game {
         forts: 0,
         ports: 0,
         factories: 0,
+        towers: 0,
       };
     });
 
@@ -501,6 +520,7 @@ export class Game {
         // Festungen bekommen Trefferpunkte (Katapulte schießen sie ab).
         const b = { owner: p.idx, kind, cell: c, built: this.turnNo };
         if (kind === 'fort') b.hp = FORT_HP;
+        if (kind === 'tower') b.cd = 0;
         this.buildings.push(b);
         this.buildingAt.set(c, b);
         p[KIND_FIELD[kind]]++;
@@ -575,6 +595,28 @@ export class Game {
         if (!path) return;
         cp.order = c;
         cp.path = path; cp.pi = 0;
+        break;
+      }
+      // Ein eigener Turm feuert auf eine Zielzelle in Reichweite. it.ammo:
+      // 'stone' | 'arrow' | 'fire' (siehe TOWER_AMMO). Kein Ziel-Vorbesitz
+      // nötig – auch neutrales Land darf beschossen werden (nur bei 'fire'
+      // sinnvoll, bei 'stone'/'arrow' passiert dort einfach nichts).
+      case 'tower_shoot': {
+        if (this.phase !== 'play') return;
+        const c = it.cell | 0;
+        const b = this.buildingAt.get(c);
+        if (!b || b.kind !== 'tower' || b.owner !== p.idx) return;
+        if (this.underConstruction(b)) return; // Turm erst nach der Aufbauzeit nutzbar
+        if (b.cd > 0) return;
+        const cfg = TOWER_AMMO[it.ammo];
+        if (!cfg) return;
+        const target = it.target | 0;
+        if (target < 0 || target >= this.map.terrain.length) return;
+        if (this.dist2(c, target) > TOWER_RANGE2) return;
+        if (p.money < cfg.cost) return;
+        p.money -= cfg.cost;
+        b.cd = cfg.reload;
+        this.applyTowerShot(p, target, it.ammo);
         break;
       }
       // Allianz anfragen bzw. eine offene Gegenanfrage annehmen
@@ -726,6 +768,62 @@ export class Game {
       if (this.dist2(r.cell, cell) <= RUIN_RADIUS2) return RUIN_COST;
     }
     return 1;
+  }
+
+  // Ein Turmschuss trifft die Zielzelle und ihre Umgebung (Radius nach
+  // Munitionsart, siehe TOWER_AMMO). 'stone'/'arrow' beschädigen gegnerische
+  // Gebäude im Aufschlag (Trefferpunkte, wie Katapulte gegen Festungen).
+  // 'fire' setzt stattdessen das Land in Brand: betroffene Gegnerzellen
+  // werden neutral und hinterlassen ein Trümmerfeld (RUIN_COST-fache
+  // Rückeroberungskosten, siehe ruinMult) – eigenes/verbündetes Land bleibt
+  // verschont.
+  applyTowerShot(p, target, ammo) {
+    const cfg = TOWER_AMMO[ammo];
+    const w = this.map.w, h = this.map.h;
+    const tx = target % w, ty = (target / w) | 0;
+    const R = cfg.radius, r2 = R * R;
+    let victim = -1;
+    for (let y = Math.max(0, ty - R); y <= Math.min(h - 1, ty + R); y++) {
+      for (let x = Math.max(0, tx - R); x <= Math.min(w - 1, tx + R); x++) {
+        const dx = x - tx, dy = y - ty;
+        if (dx * dx + dy * dy > r2) continue;
+        const c = y * w + x;
+        if (this.map.terrain[c] !== 1) continue;
+        if (ammo === 'fire') {
+          const o = this.owner[c];
+          if (o < 0 || o === p.idx || this.isAllied(o, p.idx)) continue;
+          if (victim < 0) victim = o;
+          this.setOwner(c, -1);
+          if (!this.ruins.some(r => r.cell === c)) this.ruins.push({ cell: c });
+          this.dirty.push(c);
+        } else {
+          const b = this.buildingAt.get(c);
+          if (!b || b.owner === p.idx || this.isAllied(b.owner, p.idx)) continue;
+          if (victim < 0) victim = b.owner;
+          if (b.kind === 'fort') {
+            b.hp = (b.hp === undefined ? FORT_HP : b.hp) - 1;
+            if (b.hp <= 0) this.destroyFort(b, p.idx);
+          } else {
+            b.dmg = (b.dmg || 0) + 1;
+            if (b.dmg >= TOWER_BUILDING_HP) {
+              if (b.owner >= 0) this.players[b.owner][KIND_FIELD[b.kind]]--;
+              this.buildingAt.delete(c);
+              this.buildings = this.buildings.filter(x => x !== b);
+            }
+          }
+          this.dirty.push(c);
+        }
+      }
+    }
+    if (victim >= 0) this.feedEvents.push({ t: 'towerShot', p: victim, by: p.idx, ammo });
+  }
+
+  // Turm-Cooldowns pro Tick herunterzählen (Schüsse selbst kommen als
+  // 'tower_shoot'-Intent vom Spieler, siehe applyIntent).
+  processTowers() {
+    for (const b of this.buildings) {
+      if (b.kind === 'tower' && b.cd > 0) b.cd--;
+    }
   }
 
   // ---------- Boote ----------
@@ -1313,6 +1411,7 @@ export class Game {
     this.processTrade();
     this.processWarships();
     this.processCatapults();
+    this.processTowers();
     this.buildRailNetwork();   // Netz zuerst, damit Züge das aktuelle Netz nutzen
     this.processTrains();
     this.processAttacks();

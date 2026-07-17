@@ -343,6 +343,20 @@ body.no-anim button { transition: none; }
 .build-row button.build-active { background: #e76f51; box-shadow: 0 0 0 2px #f4a261; }
 .build-icon { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; border-radius: 50%; }
 
+#towerPanel {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  margin-top: 6px; padding: 6px 8px;
+  background: rgba(22, 40, 60, 0.9);
+  border: 1px solid #f4a261;
+  border-radius: 8px;
+  font-size: 12px;
+}
+#towerPanel.hidden { display: none; }
+#towerPanelLabel { flex-shrink: 0; color: #cdd8e3; }
+.ammo-btn { flex: 1; padding: 6px 4px; font-size: 12px; }
+.ammo-btn.ammo-active { background: #e76f51; box-shadow: 0 0 0 2px #f4a261; }
+#btnAmmoCancel { flex: 0 0 auto; padding: 6px 10px; }
+
 #toast {
   /* Oben mittig, unterhalb des Karten-Hover-Tooltips (top: 64px), damit sich
      beide nie überlagern und das untere HUD frei bleibt */

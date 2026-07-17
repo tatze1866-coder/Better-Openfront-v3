@@ -1,5 +1,5 @@
 // Headless-Test der Spiel-Engine (Boote, Gebäude, Allianzen, Determinismus)
-import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS } from '../public/js/engine.js';
+import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, TOWER_AMMO, TOWER_RANGE } from '../public/js/engine.js';
 
 const results = [];
 const ok = (name, cond, extra = '') => {
@@ -1062,6 +1062,78 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   for (let i = 0; i < 60 && gk.buildingAt.get(fcell) === fort; i++) gk.turn([]);
   ok('Katapult zerstört Festung nach 3 Treffern', !gk.buildingAt.has(fcell) && gk.players[1].forts === 0);
   ok('Zerschossene Festung hinterlässt eine Ruine', gk.ruins.some(r => r.cell === fcell));
+}
+
+// ---- Spiel 6: Türme ----
+{
+  const gt = newGame(7);
+  while (gt.phase === 'spawn') gt.turn([]);
+  let myCell = -1;
+  for (let c = 0; c < gt.owner.length; c++) if (gt.owner[c] === 0) { myCell = c; break; }
+  gt.players[0].money = 5000;
+  gt.players[1].money = 5000;
+
+  gt.turn([{ p: 0, type: 'build', kind: 'tower', cell: myCell }]);
+  ok('Turm gebaut', gt.players[0].towers === 1 && gt.buildingAt.get(myCell)?.kind === 'tower');
+  ok('Turm kostet ' + BUILD_COSTS.tower + ' €',
+    Math.abs((5000 - BUILD_COSTS.tower) - gt.players[0].money) < 5);
+  for (let i = 0; i < 55; i++) gt.turn([]);
+
+  // Landfeld in Schussreichweite dem Gegner zuweisen (unabhängig von der
+  // zufälligen Spawn-Distanz auf dieser Karte)
+  const w = gt.map.w, h = gt.map.h;
+  const mx = myCell % w, my = (myCell / w) | 0;
+  let enemyCell = -1;
+  for (let dy = -TOWER_RANGE; dy <= TOWER_RANGE && enemyCell < 0; dy++) {
+    for (let dx = -TOWER_RANGE; dx <= TOWER_RANGE && enemyCell < 0; dx++) {
+      const x = mx + dx, y = my + dy;
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const c = y * w + x;
+      if (c === myCell || gt.map.terrain[c] !== 1) continue;
+      if (dx * dx + dy * dy > TOWER_RANGE * TOWER_RANGE) continue;
+      enemyCell = c;
+    }
+  }
+  ok('Landfeld in Turm-Reichweite gefunden', enemyCell >= 0);
+  gt.setOwner(enemyCell, 1);
+
+  gt.turn([{ p: 1, type: 'build', kind: 'fort', cell: enemyCell }]);
+  for (let i = 0; i < 55; i++) gt.turn([]);
+  const tfort = gt.buildingAt.get(enemyCell);
+  ok('Gegnerische Festung steht', !!tfort && tfort.kind === 'fort');
+
+  const hpBefore = tfort.hp;
+  const moneyBefore = gt.players[0].money;
+  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: enemyCell }]);
+  ok('Stein beschädigt die Festung', tfort.hp === hpBefore - 1, `hp ${hpBefore} -> ${tfort.hp}`);
+  ok('Stein-Schuss kostet ' + TOWER_AMMO.stone.cost + ' €',
+    Math.abs((moneyBefore - TOWER_AMMO.stone.cost) - gt.players[0].money) < 1);
+  ok('Turm hat jetzt Cooldown', gt.buildingAt.get(myCell).cd > 0);
+
+  // Zweiter Schuss während des Cooldowns wird ignoriert (cd zaehlt nur
+  // weiter herunter, springt nicht auf den vollen Reload-Wert zurueck)
+  const cdBefore = gt.buildingAt.get(myCell).cd;
+  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: enemyCell }]);
+  ok('Zweiter Schuss während Cooldown wird ignoriert', gt.buildingAt.get(myCell).cd === cdBefore - 1);
+
+  // Cooldown abwarten, dann Feuerpfeil auf ein zweites Gegnerfeld
+  for (let i = 0; i < 45; i++) gt.turn([]);
+  let fireCell = -1;
+  for (let c = 0; c < gt.owner.length; c++) {
+    if (c !== enemyCell && gt.map.terrain[c] === 1 && gt.dist2(myCell, c) <= TOWER_RANGE * TOWER_RANGE) { fireCell = c; break; }
+  }
+  gt.setOwner(fireCell, 1);
+  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: fireCell }]);
+  ok('Feuerpfeil macht gegnerisches Land neutral', gt.owner[fireCell] === -1);
+  ok('Feuerpfeil hinterlässt ein Trümmerfeld (Ruine)', gt.ruins.some(r => r.cell === fireCell));
+  ok('Trümmerfeld verdoppelt die Rückeroberungskosten', gt.ruinMult(fireCell) === 2,
+    'ruinMult=' + gt.ruinMult(fireCell));
+
+  // Eigenes Land bleibt beim Feuerpfeil verschont
+  for (let i = 0; i < 45; i++) gt.turn([]);
+  const ownBefore = gt.owner[myCell];
+  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: myCell }]);
+  ok('Feuerpfeil verschont eigenes Land', gt.owner[myCell] === ownBefore);
 }
 
 console.log(results.join('\n'));
