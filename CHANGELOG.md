@@ -3,6 +3,16 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.14.1] – 2026-07-17
+
+### Geändert
+- **Bots und Nationen schlagen zurück**: Wer einen Bot oder eine Nation
+  angreift (auch per Boot), macht sich für 60 Sekunden zum Feind – der
+  Angegriffene schlägt bevorzugt zurück, sobald er annähernd gleich stark
+  ist (80% reichen), und lehnt Allianz-Anfragen des Angreifers ab. Auch
+  die sonst passiven Masse-Bots wehren sich jetzt. Angriffe sind damit
+  nicht mehr "gratis".
+
 ## [0.14.0] – 2026-07-17
 
 ### Hinzugefügt

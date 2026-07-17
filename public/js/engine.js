@@ -53,6 +53,10 @@ const DEFENDER_LOSS_PER_CELL = 1.8;  // Verteidiger-Verlust je verlorener Zelle 
 const NEUTRAL_INTERVAL = 3;          // gegen Neutral: Front alle 3 Ticks
 const ENEMY_INTERVAL = 5;            // gegen Spieler: etwas langsamer
 const CLASH_SPEED_CAP = 5;           // Gegenangriffe: max. Beschleunigung der stärkeren Front
+// Vergeltung: Bots merken sich, wer sie zuletzt angegriffen hat, und schlagen
+// bevorzugt zurück – Angriffe bleiben damit nie "gratis".
+const GRUDGE_TICKS = 600;            // 60s: so lange hält der Groll
+const REVENGE_THRESHOLD = 0.8;       // Gegenschlag schon ab 80% der Truppen des Angreifers
 const ATTACK_SPEED_CAP = 4;          // Übermacht: max. Beschleunigung nach Pool/haltende Truppen
 const WIN_FRACTION = 0.7;            // 70% des Landes = Sieg
 
@@ -217,6 +221,8 @@ export class Game {
         troops: START_TROOPS,
         money: START_MONEY,
         territory: 0,
+        lastAggressor: -1,   // wer diesen Spieler zuletzt angegriffen hat
+        grudgeUntil: 0,      // bis zu welchem Tick der Groll hält (Vergeltung)
         cities: 0,
         forts: 0,
         ports: 0,
@@ -663,7 +669,12 @@ export class Game {
       const cost = (defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST) * this.fortBonus(cell, o);
       if (boat.troops <= cost) continue; // Landung abgewehrt
       let pool = boat.troops - cost;
-      if (defender) defender.troops = Math.max(0, defender.troops - density * 0.9);
+      if (defender) {
+        defender.troops = Math.max(0, defender.troops - density * 0.9);
+        // Auch Invasionen bleiben nicht ungestraft (siehe Vergeltung in botAct)
+        defender.lastAggressor = boat.owner;
+        defender.grudgeUntil = this.turnNo + GRUDGE_TICKS;
+      }
       this.setOwner(cell, boat.owner);
       if (defender && defender.territory === 0) this.eliminate(defender);
       if (pool >= 1) {
@@ -1146,6 +1157,12 @@ export class Game {
         continue;
       }
 
+      // Der Verteidiger merkt sich den Angreifer – Bots schlagen zurück (botAct)
+      if (defender) {
+        defender.lastAggressor = atk.attacker;
+        defender.grudgeUntil = this.turnNo + GRUDGE_TICKS;
+      }
+
       const density = defender ? defender.troops / Math.max(1, defender.territory) : 0;
       const baseCost = defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST;
       let captured = 0;
@@ -1329,11 +1346,16 @@ export class Game {
   // schwaechsten Nachbarn; ohne Landziel per Boot auf andere Inseln expandieren.
   // Greift nur an, wenn genug Truppen frei sind (nicht alles schon gebunden).
   botAct(p, L) {
-    // Allianz-Anfragen beantworten (Zustimmung je nach Schwierigkeit)
+    // Groll: wer diesen Bot kürzlich angegriffen hat (Vergeltung, s.u.)
+    const grudge = p.grudgeUntil > this.turnNo ? p.lastAggressor : -1;
+
+    // Allianz-Anfragen beantworten (Zustimmung je nach Schwierigkeit).
+    // Wer uns gerade bekriegt, bekommt grundsätzlich KEINE Allianz.
     for (let x = 0; x < this.players.length; x++) {
       const key = `${x}:${p.idx}`;
       if (this.allyRequests.has(key)) {
-        if (this.rng() < L.allyAccept) this.applyIntent({ p: p.idx, type: 'ally', target: x });
+        if (x === grudge) this.allyRequests.delete(key);
+        else if (this.rng() < L.allyAccept) this.applyIntent({ p: p.idx, type: 'ally', target: x });
         else this.allyRequests.delete(key);
       }
     }
@@ -1357,6 +1379,18 @@ export class Game {
         if (this.map.terrain[m] !== 1) continue;
         const o = this.owner[m];
         if (o !== p.idx) neighborOwners.add(o);
+      }
+    }
+
+    // Vergeltung hat Vorrang: Wer uns kürzlich angegriffen hat, wird zurück-
+    // geschlagen – auch von Masse-Bots und schon bei annähernd gleicher Stärke
+    // (REVENGE_THRESHOLD statt des normalen, vorsichtigeren L.threshold).
+    // Angriffe auf Bots und Nationen bleiben damit nie ungestraft.
+    if (grudge >= 0 && neighborOwners.has(grudge)) {
+      const e = this.players[grudge];
+      if (e.alive && !this.isAllied(p.idx, grudge) && p.troops > e.troops * REVENGE_THRESHOLD) {
+        this.applyIntent({ p: p.idx, type: 'attack', target: grudge, ratio: L.ratioE });
+        return;
       }
     }
 

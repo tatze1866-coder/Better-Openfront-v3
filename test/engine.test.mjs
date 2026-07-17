@@ -789,6 +789,57 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Festung nach 5s: 5x Verteidigung', gb.fortBonus(fortCell, 0) === 5);
 }
 
+// ---- Spiel 12g: Vergeltung – Angriffe bleiben nicht ungestraft ----
+{
+  const gv = newGame(71);
+  while (gv.phase === 'spawn') gv.turn([]);
+  const W = gv.map.w;
+  const at = (x, y) => y * W + x;
+  // 20x6-Landstreifen suchen: links Mensch (0), rechts Bot (1) – direkte Grenze
+  let base = -1;
+  for (const c of gv.landCells) {
+    const x = c % W, y = (c / W) | 0;
+    if (x < 20 || y < 20 || x >= W - 40 || y >= gv.map.h - 20) continue;
+    let frei = true;
+    for (let dx = 0; dx < 20 && frei; dx++) {
+      for (let dy = 0; dy < 6; dy++) {
+        if (gv.map.terrain[at(x + dx, y + dy)] !== 1) { frei = false; break; }
+      }
+    }
+    if (frei) { base = c; break; }
+  }
+  ok('Landstreifen für Vergeltungs-Test gefunden', base >= 0);
+  const bx = base % W, by = (base / W) | 0;
+  for (let dx = 0; dx < 10; dx++) for (let dy = 0; dy < 6; dy++) gv.setOwner(at(bx + dx, by + dy), 0);
+  for (let dx = 10; dx < 20; dx++) for (let dy = 0; dy < 6; dy++) gv.setOwner(at(bx + dx, by + dy), 1);
+
+  const bot = gv.players[1];
+  gv.players[0].troops = 8000;   // Angreifer ist deutlich stärker …
+  bot.troops = 5000;             // … Bot schlägt trotzdem zurück (0.8-Schwelle)
+  gv.turn([{ p: 0, type: 'attack', target: 1, ratio: 0.3 }]);
+  for (let i = 0; i < 6; i++) gv.turn([]); // erster Vorstoß der Front
+  ok('Verteidiger merkt sich den Angreifer', bot.lastAggressor === 0 && bot.grudgeUntil > gv.turnNo,
+    `lastAggressor ${bot.lastAggressor}`);
+
+  // Hit-and-Run: Der Angreifer zieht sich zurück – der Groll bleibt trotzdem,
+  // und der Bot schlägt zurück, obwohl der Angreifer nicht schwächer ist.
+  gv.turn([{ p: 0, type: 'retreat', target: 1 }]);
+  gv.players[0].troops = 5500;
+  bot.troops = 5000; // 5000 > 5500 * 0.8 -> Vergeltungsschwelle erreicht
+  let strikesBack = false;
+  for (let i = 0; i < 60 && !strikesBack; i++) {
+    gv.turn([]);
+    strikesBack = gv.attacks.some(a => a.attacker === 1 && a.target === 0 && a.pool > 0);
+  }
+  ok('Bot schlägt zurück (Vergeltung)', strikesBack);
+
+  // Der Angreifer bekommt vom Bot keine Allianz, solange der Groll hält
+  gv.allyRequests.add('0:1');
+  for (let i = 0; i < 30; i++) gv.turn([]);
+  ok('Allianz-Anfrage des Angreifers wird abgelehnt',
+    !gv.isAllied(0, 1) && !gv.allyRequests.has('0:1'));
+}
+
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----
 {
   const gc = newGame(7);
