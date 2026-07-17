@@ -106,8 +106,8 @@ document.addEventListener('keydown', e => {
     closeIconPicker();
   } else if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
     closeProfile();
-  } else if (e.key === 'Escape' && selectedWarship >= 0) {
-    setSelectedWarship(-1); // Kriegsschiff-Auswahl aufheben
+  } else if (e.key === 'Escape' && selectedWarships.size) {
+    clearWarshipSelection(); // Kriegsschiff-Auswahl aufheben
   }
 });
 
@@ -759,7 +759,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   $('leaderboard').innerHTML = '';
   $('lbTip').classList.add('hidden');
   $('eventFeed').innerHTML = ''; // Feed gehört zum alten Spiel
-  setSelectedWarship(-1);        // Kriegsschiff-Auswahl gehört auch dazu
+  clearWarshipSelection();       // Kriegsschiff-Auswahl gehört auch dazu
   $('attackList').classList.add('hidden');
   // Allianz-Anfrage-Karten gehören auch zum alten Spiel -> entfernen
   for (const card of allyReqCards.values()) card.remove();
@@ -1421,6 +1421,13 @@ let pointerDown = false, panned = false, lastX = 0, lastY = 0;
 canvas.addEventListener('pointerdown', e => {
   if (e.button !== 0) return; // nur Linksklick pannt/agiert
   if (!ctxMenu.classList.contains('hidden')) { hideCtxMenu(); return; } // offenes Menü nur schließen
+  // Shift+Ziehen: Auswahlrechteck für Kriegsschiffe (kein Panning/Klick)
+  if (e.shiftKey && game && renderer && game.phase === 'play') {
+    selectRect = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY };
+    renderer.selectRect = selectRect;
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetische Events */ }
+    return;
+  }
   pointerDown = true;
   panned = false;
   lastX = e.clientX;
@@ -1433,6 +1440,12 @@ canvas.addEventListener('pointerdown', e => {
 let mapHoverIdx = -1, mapHoverX = 0, mapHoverY = 0;
 
 canvas.addEventListener('pointermove', e => {
+  if (selectRect) {
+    // Auswahlrechteck mitziehen (der Renderer zeichnet es)
+    selectRect.x1 = e.clientX;
+    selectRect.y1 = e.clientY;
+    return;
+  }
   if (pointerDown && renderer) {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     if (panned || Math.abs(dx) + Math.abs(dy) > 4) {
@@ -1461,14 +1474,49 @@ canvas.addEventListener('pointerleave', () => {
 });
 
 // ---------- Kriegsschiff-Auswahl ----------
-// Klick auf ein eigenes Kriegsschiff wählt es aus, der nächste Klick aufs
-// Wasser schickt es dorthin (warship_move-Intent). Klick woanders hebt die
-// Auswahl wieder auf.
-let selectedWarship = -1;
+// Klick auf ein eigenes Kriegsschiff wählt genau dieses aus; Shift+Ziehen
+// zieht ein Auswahlrechteck über mehrere eigene Schiffe. Der nächste Klick
+// aufs Wasser schickt alle ausgewählten Schiffe dorthin (ein warship_move-
+// Intent pro Schiff). Klick an Land oder Esc hebt die Auswahl auf.
+let selectedWarships = new Set();
 
-function setSelectedWarship(id) {
-  selectedWarship = id;
-  if (renderer) renderer.selectedWarshipId = id;
+function setWarshipSelection(ids) {
+  selectedWarships = new Set(ids);
+  if (renderer) renderer.selectedWarshipIds = selectedWarships;
+}
+
+function clearWarshipSelection() {
+  setWarshipSelection([]);
+}
+
+// Shift-Auswahlrechteck in Bildschirmkoordinaten (null = keins aktiv)
+let selectRect = null;
+
+// Rechteck auswerten: alle eigenen Kriegsschiffe im Rahmen auswählen
+function finishRectSelect() {
+  const r = selectRect;
+  selectRect = null;
+  if (renderer) renderer.selectRect = null;
+  if (!game || !renderer || game.phase !== 'play') return;
+  const xMin = Math.min(r.x0, r.x1), xMax = Math.max(r.x0, r.x1);
+  const yMin = Math.min(r.y0, r.y1), yMax = Math.max(r.y0, r.y1);
+  const w = game.map.w;
+  const ids = [];
+  for (const ws of game.warships) {
+    if (ws.owner !== myIdx) continue;
+    // Zellmitte des Schiffs in Bildschirmkoordinaten
+    const sx = renderer.ox + (ws.cell % w + 0.5) * renderer.scale;
+    const sy = renderer.oy + (((ws.cell / w) | 0) + 0.5) * renderer.scale;
+    if (sx >= xMin && sx <= xMax && sy >= yMin && sy <= yMax) ids.push(ws.id);
+  }
+  if (!ids.length) {
+    showToast('Keine eigenen Kriegsschiffe im Rechteck.');
+    return;
+  }
+  setWarshipSelection(ids);
+  showToast(ids.length === 1
+    ? 'Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴'
+    : `${ids.length} Kriegsschiffe ausgewählt – Ziel auf dem Wasser anklicken. ⛴`);
 }
 
 // Eigenes Kriegsschiff nahe der Klickzelle (großzügiger Fangradius)
@@ -1494,27 +1542,34 @@ function ownCellOnIsland(islandId) {
 // Linksklick auf die Karte auswerten (nur wenn nicht gepannt wurde): je nach
 // Phase/Modus Startpunkt setzen, bauen, angreifen oder ein Boot losschicken.
 canvas.addEventListener('pointerup', e => {
+  if (selectRect) { finishRectSelect(); return; } // Shift-Rechteck auswerten
   if (!pointerDown) return;
   pointerDown = false;
   if (panned || !game || !renderer) return;
   const cell = renderer.screenToCell(e.clientX, e.clientY);
 
-  // Kriegsschiff-Steuerung: eigenes Schiff anklicken, dann Ziel aufs Wasser
+  // Kriegsschiff-Steuerung: eigene Schiffe anklicken/aufziehen, dann Ziel aufs Wasser
   if (game.phase === 'play' && !buildMode) {
     const ws = ownWarshipAt(cell);
     if (ws) {
-      setSelectedWarship(ws.id === selectedWarship ? -1 : ws.id);
-      if (selectedWarship >= 0) showToast('Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴');
+      // Einzelklick ersetzt die Auswahl; erneuter Klick auf das bereits
+      // einzeln ausgewählte Schiff hebt sie auf.
+      const wasOnly = selectedWarships.size === 1 && selectedWarships.has(ws.id);
+      setWarshipSelection(wasOnly ? [] : [ws.id]);
+      if (selectedWarships.size) showToast('Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴');
       return;
     }
-    if (selectedWarship >= 0) {
+    if (selectedWarships.size) {
       if (cell >= 0 && game.map.terrain[cell] === 0) {
-        sendIntent({ type: 'warship_move', id: selectedWarship, cell });
-        showToast('Kriegsschiff nimmt Kurs! ⛴');
-        setSelectedWarship(-1);
+        // Ein Intent pro Schiff – jedes rechnet seinen eigenen Seeweg
+        for (const id of selectedWarships) sendIntent({ type: 'warship_move', ship: id, cell });
+        showToast(selectedWarships.size === 1
+          ? 'Kriegsschiff nimmt Kurs! ⛴'
+          : `${selectedWarships.size} Kriegsschiffe nehmen Kurs! ⛴`);
+        clearWarshipSelection();
         return;
       }
-      setSelectedWarship(-1); // Klick an Land: Auswahl aufheben, normal weiter
+      clearWarshipSelection(); // Klick an Land: Auswahl aufheben, normal weiter
     }
   }
 

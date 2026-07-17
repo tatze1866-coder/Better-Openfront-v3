@@ -926,15 +926,15 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Wasser-Wegpunkt gefunden', target >= 0);
 
   // Fremder Spieler darf das Schiff nicht steuern
-  gw.applyIntent({ p: 1, type: 'warship_move', id: ws.id, cell: target });
+  gw.applyIntent({ p: 1, type: 'warship_move', ship: ws.id, cell: target });
   ok('Fremdes Kriegsschiff nicht steuerbar', ws.order === -1);
 
   // Landziel wird ignoriert
-  gw.applyIntent({ p: 0, type: 'warship_move', id: ws.id, cell: gw.landCells[0] });
+  gw.applyIntent({ p: 0, type: 'warship_move', ship: ws.id, cell: gw.landCells[0] });
   ok('Landziel wird ignoriert', ws.order === -1);
 
   // Gültiger Befehl: Wegpunkt gesetzt, Schiff fährt hin, Befehl erlischt
-  gw.applyIntent({ p: 0, type: 'warship_move', id: ws.id, cell: target });
+  gw.applyIntent({ p: 0, type: 'warship_move', ship: ws.id, cell: target });
   ok('Wegpunkt gesetzt', ws.order === target && ws.path.length > 0);
   let arrived = false;
   for (let i = 0; i < 600 && !arrived; i++) {
@@ -944,6 +944,34 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Kriegsschiff erreicht den Wegpunkt', arrived, `Distanz² am Ende: ${gw.dist2(ws.cell, target)}`);
   for (let i = 0; i < 30; i++) gw.turn([]);
   ok('Befehl nach Ankunft erledigt (zurück zur Patrouille)', ws.order === -1);
+}
+
+// ---- Spiel 15: warship_move trifft das richtige Schiff (Bug-Fix 0.16.1) ----
+// Zwei Schiffe desselben Spielers: ein Befehl für das ZWEITE darf nur dessen
+// Kurs setzen – das erste bleibt unverändert (früher landete der Befehl durch
+// das verschluckte id-Feld immer bei Schiff 0).
+{
+  const gw = newGame(92);
+  while (gw.phase === 'spawn') gw.turn([]);
+
+  const water = [];
+  for (let c = 0; c < gw.map.terrain.length; c++) if (gw.map.terrain[c] === 0) water.push(c);
+  const start = water[0];
+  gw.warships.push({ id: gw.warshipSeq++, owner: 0, home: start, cell: start, path: [], pi: 0, dmg: 0, born: gw.turnNo, cd: 12, order: -1 });
+  gw.warships.push({ id: gw.warshipSeq++, owner: 0, home: start, cell: start, path: [], pi: 0, dmg: 0, born: gw.turnNo, cd: 12, order: -1 });
+  const [w1, w2] = gw.warships;
+  ok('Schiffe haben verschiedene IDs', w1.id !== w2.id);
+
+  // Erreichbares, entferntes Wasserziel suchen
+  let target = -1;
+  for (const c of water) {
+    if (gw.dist2(c, start) >= 400 && gw.bfsWater([start], q => q === c)) { target = c; break; }
+  }
+  ok('Wasser-Wegpunkt gefunden (2 Schiffe)', target >= 0);
+
+  gw.applyIntent({ p: 0, type: 'warship_move', ship: w2.id, cell: target });
+  ok('Befehl setzt Kurs NUR beim zweiten Schiff', w2.order === target && w2.path.length > 0);
+  ok('Erstes Schiff bleibt ohne Befehl', w1.order === -1);
 }
 
 console.log(results.join('\n'));

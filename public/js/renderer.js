@@ -70,7 +70,8 @@ export class Renderer {
     this.factoryHint = false;
     this.buildingStyle = 'orig'; // 'orig' = Emoji/Formen, 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
-    this.selectedWarshipId = -1; // per Klick ausgewaehltes eigenes Kriegsschiff
+    this.selectedWarshipIds = new Set(); // per Klick/Rechteck ausgewaehlte eigene Kriegsschiffe
+    this.selectRect = null; // Shift-Auswahlrechteck in Bildschirmkoordinaten ({x0,y0,x1,y1})
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -365,6 +366,18 @@ export class Renderer {
     this.updateLabels(now);              // Flaechen-Schwerpunkte periodisch neu berechnen
     this.drawLabels(ctx);                // Spielernamen auf groesster Flaeche
 
+    // Shift-Auswahlrechteck (Bildschirmkoordinaten, von main.js gesetzt)
+    if (this.selectRect) {
+      const r = this.selectRect;
+      const x = Math.min(r.x0, r.x1), y = Math.min(r.y0, r.y1);
+      const rw = Math.abs(r.x1 - r.x0), rh = Math.abs(r.y1 - r.y0);
+      ctx.fillStyle = 'rgba(244, 162, 97, 0.15)';
+      ctx.fillRect(x, y, rw, rh);
+      ctx.strokeStyle = '#f4a261';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x, y, rw, rh);
+    }
+
     this.drawMinimap();
   }
 
@@ -629,8 +642,8 @@ export class Renderer {
     // Kriegsschiffe (größer, mit Lebensbalken)
     for (const ws of g.warships) {
       const x = cx(ws.cell), y = cy(ws.cell);
-      // Ausgewaehltes eigenes Schiff: goldener Ring + Linie/Marke zum Wegpunkt
-      if (ws.id === this.selectedWarshipId && ws.owner === this.myIdx) {
+      // Ausgewaehlte eigene Schiffe: goldener Ring + Linie/Marke zum Wegpunkt
+      if (this.selectedWarshipIds.has(ws.id) && ws.owner === this.myIdx) {
         if (ws.order >= 0) {
           const ox = cx(ws.order), oy = cy(ws.order);
           ctx.strokeStyle = 'rgba(244,162,97,0.7)';

@@ -209,6 +209,8 @@ function handleMessage(ws, m) {
       if (typeof d.target === 'number') intent.target = d.target | 0;
       if (typeof d.ratio === 'number') intent.ratio = Math.max(0.01, Math.min(1, d.ratio));
       if (typeof d.cell === 'number') intent.cell = d.cell | 0;
+      // Kriegsschiff-ID fuer 'warship_move' (Feldname muss zu engine.js passen)
+      if (typeof d.ship === 'number') intent.ship = d.ship | 0;
       if (typeof d.kind === 'string') {
         intent.kind = ['city', 'fort', 'port', 'factory'].includes(d.kind) ? d.kind : 'city';
       }

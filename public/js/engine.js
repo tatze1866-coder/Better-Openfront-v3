@@ -486,10 +486,12 @@ export class Game {
       }
       // Einem eigenen Kriegsschiff einen Wegpunkt (Wasserzelle) zuweisen.
       // Der Wegpunkt hat Vorrang vor Jagd/Patrouille (nicht vor Notreparatur)
-      // und gilt, bis das Schiff ihn erreicht hat.
+      // und gilt, bis das Schiff ihn erreicht hat. Das Feld heißt bewusst
+      // "ship" (nicht "id"), damit es nicht mit anderen id-Feldern kollidiert –
+      // server.js muss es beim Weiterleiten explizit durchreichen!
       case 'warship_move': {
         if (this.phase !== 'play') return;
-        const w = this.warships.find(x => x.id === (it.id | 0));
+        const w = this.warships.find(x => x.id === (it.ship | 0));
         if (!w || w.owner !== p.idx) return;
         const c = it.cell | 0;
         if (c < 0 || c >= this.map.terrain.length || this.map.terrain[c] !== 0) return;

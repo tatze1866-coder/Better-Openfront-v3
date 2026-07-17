@@ -3,6 +3,24 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.16.1] – 2026-07-17
+
+### Hinzugefügt
+- **Rechteckauswahl für Kriegsschiffe**: Shift + Linksklick-Ziehen zieht
+  einen goldenen Auswahlrahmen auf – alle eigenen Kriegsschiffe darin sind
+  danach gleichzeitig ausgewählt und fahren mit einem Klick aufs Wasser
+  gemeinsam dorthin (jedes Schiff auf seinem eigenen Seeweg). Esc oder ein
+  Klick an Land hebt die gesamte Auswahl auf.
+
+### Behoben
+- **Kriegsschiff-Befehl traf das falsche Schiff**: Im Lobby-Spiel hat der
+  Server die Schiff-ID des Fahrbefehls verschluckt – dadurch bekam immer
+  das zuerst gebaute Schiff den Kurs (bzw. beim Mitspieler gar keines).
+  Das Feld heißt jetzt `ship` und wird vom Server durchgereicht; der
+  Befehl landet immer beim ausgewählten Schiff.
+- **Kriegsschiff-Steuerung für Mitspieler**: Beigetretene Spieler können
+  ihre Kriegsschiffe jetzt auch im Online-Spiel steuern (gleiche Ursache).
+
 ## [0.16.0] – 2026-07-17
 
 ### Hinzugefügt
