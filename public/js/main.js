@@ -77,7 +77,6 @@ function openSettings() {
   updateLangSeg();
   updateAnimSeg();
   updateFpsSeg();
-  updateBuildingStyleSeg();
   updateVolumeDisplay();
   $('settingsOverlay').classList.remove('hidden');
 }
@@ -101,6 +100,9 @@ $('settingsOverlay').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('settingsOverlay').classList.contains('hidden')) {
     closeSettings();
+  }
+  if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
+    closeProfile();
   }
 });
 
@@ -232,17 +234,46 @@ function playerName() {
   return ($('nameInput').value.trim() || 'Spieler').slice(0, 16);
 }
 
-// Profil-Button oben rechts zeigt live denselben Namen wie das Username-Feld.
+// Profil-Button oben rechts zeigt live denselben Namen wie das Username-Feld;
+// im Profil-Dialog selbst gibt es ein zweites Namensfeld, das mit demselben
+// Wert synchron gehalten wird (beide schreiben auf #nameInput).
 function updateProfileName() {
-  $('profileName').textContent = playerName();
+  const n = playerName();
+  $('profileName').textContent = n;
+  $('profileNavName').textContent = n;
+  if (document.activeElement !== $('profileNameInput')) $('profileNameInput').value = $('nameInput').value;
 }
 updateProfileName();
 $('nameInput').addEventListener('input', updateProfileName);
-// Noch keine echte Profilseite -> Klick springt zum Username-Feld, wo der
-// Name geaendert werden kann.
-$('profileBtn').addEventListener('click', () => {
-  $('nameInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  $('nameInput').focus();
+$('profileNameInput').addEventListener('input', () => {
+  $('nameInput').value = $('profileNameInput').value;
+  updateProfileName();
+});
+
+// Profil-Dialog öffnen/schließen
+function openProfile() {
+  updateBuildingStyleSeg();
+  $('profileNameInput').value = $('nameInput').value;
+  $('profileOverlay').classList.remove('hidden');
+}
+function closeProfile() {
+  $('profileOverlay').classList.add('hidden');
+}
+$('profileBtn').addEventListener('click', openProfile);
+$('btnProfileClose').addEventListener('click', closeProfile);
+$('profileOverlay').addEventListener('click', e => {
+  if (e.target === $('profileOverlay')) closeProfile();
+});
+
+// Tabs im Profil-Dialog (Player / Skins / Statistiken / Spielverlauf)
+$('profileOverlay').querySelectorAll('.profile-nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const panel = btn.dataset.panel;
+    $('profileOverlay').querySelectorAll('.profile-nav-btn').forEach(b => b.classList.toggle('sel', b === btn));
+    $('profileOverlay').querySelectorAll('.profile-panel').forEach(p => {
+      p.classList.toggle('hidden', p.dataset.panel !== panel);
+    });
+  });
 });
 
 // ---------- Menü ----------

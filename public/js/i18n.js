@@ -24,6 +24,14 @@ const dict = {
   buildingStyleOrig: { de: 'Standard (Emoji)', en: 'Standard (emoji)' },
   buildingStyleOld: { de: 'Alt (Wappen)', en: 'Old (badges)' },
   buildingStyleNew: { de: 'Neu (Inseln)', en: 'New (islands)' },
+  buildingStyleHint: { de: 'Gilt nur für deine eigenen Gebäude/Züge – Bots und andere Nationen bleiben beim Standard.', en: 'Applies only to your own buildings/trains – bots and other nations stay standard.' },
+  profileNavSkins: { de: 'Skins', en: 'Skins' },
+  profileNavStats: { de: 'Statistiken', en: 'Statistics' },
+  profileNavHistory: { de: 'Spielverlauf', en: 'Match history' },
+  profileNameLabel: { de: 'Spielername', en: 'Player name' },
+  profileNameHint: { de: 'Gilt für Einzel- und Mehrspieler – dasselbe Feld wie im Menü.', en: 'Used for single- and multiplayer – same field as in the menu.' },
+  profileStatsSoon: { de: 'Statistiken werden noch gesammelt – hier gibt\'s bald Siege, Niederlagen und mehr.', en: 'Stats are still being collected – wins, losses and more coming soon.' },
+  profileHistorySoon: { de: 'Noch keine gespeicherten Spiele – der Spielverlauf kommt in einem späteren Update.', en: 'No saved games yet – match history is coming in a later update.' },
 
   // ---------- Hauptmenü ----------
   soloHeading: { de: 'Einzelspieler', en: 'Singleplayer' },
