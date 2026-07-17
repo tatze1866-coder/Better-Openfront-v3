@@ -21,7 +21,7 @@ const settings = {
   volume: parseInt(localStorage.getItem('ofVolume') ?? '80', 10),
   animations: localStorage.getItem('ofAnimations') ?? 'on',
   fps: localStorage.getItem('ofFps') ?? 'off',
-  buildingStyle: localStorage.getItem('ofBuildingStyle') ?? 'v2',
+  buildingStyle: localStorage.getItem('ofBuildingStyle') ?? 'orig',
 };
 
 // Einstellungen beim Start anwenden
@@ -732,6 +732,7 @@ const BUILD_KINDS = [
   { kind: 'factory', btn: 'btnFactory', label: 'Fabrik', key: '4' },
 ];
 const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik' };
+const KIND_EMOJI = { city: '🏙', fort: '🛡', port: '⚓', factory: '🏭' };
 
 // Bildpfad je nach gewähltem Gebäude-Grafikstil (altes Wappen-Set / neues
 // Insel-Set). settings.buildingStyle: 'v1' (alt) oder 'v2' (neu, Default).
@@ -756,6 +757,9 @@ function updateBuildButtons() {
   if (renderer) renderer.factoryHint = buildMode === 'factory';
 }
 function buildBtnHtml(bk, cost) {
+  if (settings.buildingStyle === 'orig') {
+    return `${KIND_EMOJI[bk.kind]} ${bk.label} (${cost}€)`;
+  }
   return `<img class="build-icon" src="${iconPath(bk.kind)}" alt="">${bk.label} (${cost}€)`;
 }
 for (const bk of BUILD_KINDS) {
