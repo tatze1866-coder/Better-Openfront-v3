@@ -13,7 +13,7 @@ const dict = {
   guideIconTitle: { de: 'Anleitung (bald verfügbar)', en: 'Guide (coming soon)' },
   statsIconTitle: { de: 'Statistik (bald verfügbar)', en: 'Stats (coming soon)' },
   volumeLabel: { de: 'Lautstärke', en: 'Volume' },
-  volumeSoonNote: { de: 'Ton kommt später – der Regler gilt dann schon.', en: 'Sound is coming later – the slider will apply then.' },
+  volumeSoonNote: { de: 'Gilt bisher nur für den Warnton bei ankommenden Booten.', en: 'Currently only applies to the incoming-boat warning sound.' },
   animationsLabel: { de: 'Animationen', en: 'Animations' },
   animOn: { de: 'An', en: 'On' },
   animOff: { de: 'Aus', en: 'Off' },

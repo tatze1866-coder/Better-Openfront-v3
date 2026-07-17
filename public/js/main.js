@@ -29,6 +29,24 @@ const settings = {
 applyStaticTranslations();
 applyAnimations();
 
+// ---------- Sound ----------
+// Bisher nur ein Effekt: Warnton, wenn ein feindliches Boot in Richtung des
+// eigenen Gebiets unterwegs ist. Lautstärke folgt dem Regler in den
+// Einstellungen (0-100 -> 0-1). Jeder Aufruf bekommt ein frisches Audio-
+// Objekt, damit sich schnell aufeinanderfolgende Warnungen nicht gegenseitig
+// abschneiden.
+const SOUNDS = {
+  boatIncoming: 'audio/boat-incoming.wav',
+};
+function playSound(name) {
+  if (settings.volume <= 0) return;
+  const src = SOUNDS[name];
+  if (!src) return;
+  const audio = new Audio(src);
+  audio.volume = Math.min(1, Math.max(0, settings.volume / 100));
+  audio.play().catch(() => {}); // Autoplay-Sperren o.ä. still ignorieren
+}
+
 // Animations-Einstellung anwenden: schaltet dekorative UI-Effekte ab
 // (Geld-Popups-Animation, Übergänge, Hover-Zoom der Farbfelder). Rein
 // kosmetisch – Simulation und Karten-Rendering laufen unverändert.
@@ -1108,6 +1126,9 @@ function showFeedEvents() {
         : `💀 ${nm(e.p)} wurde ausgelöscht`, e.by === myIdx ? false : true);
     } else if (e.t === 'atk' && e.p === myIdx) {
       pushFeed(`⚔ ${nm(e.by)} greift dich an!`, true);
+    } else if (e.t === 'boat' && e.p === myIdx) {
+      pushFeed(`🚤 ${nm(e.by)} schickt ein Boot in deine Richtung!`, true);
+      playSound('boatIncoming');
     } else if (e.t === 'ally' && e.a !== myIdx && e.b !== myIdx) {
       pushFeed(`🤝 ${nm(e.a)} und ${nm(e.b)} sind jetzt verbündet`, false);
     } else if (e.t === 'unally' && e.a !== myIdx) {

@@ -475,6 +475,13 @@ export class Game {
         if (!res) return;
         p.troops -= troops;
         this.boats.push({ owner: p.idx, troops, path: res.path, landing: res.landing, pos: 0 });
+        // Landebesitzer ermitteln (kann durch Pfadfindung vom angeklickten Ziel
+        // abweichen) und melden, falls ein Spieler bedroht wird – der Client
+        // spielt dafuer einen Warnton ab (siehe showFeedEvents in main.js).
+        const landingOwner = this.owner[res.landing];
+        if (landingOwner >= 0 && landingOwner !== p.idx) {
+          this.feedEvents.push({ t: 'boat', p: landingOwner, by: p.idx });
+        }
         break;
       }
       // Gebaeude auf eigenem Gebiet errichten (Geld wird abgezogen)
