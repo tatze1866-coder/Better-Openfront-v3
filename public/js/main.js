@@ -705,10 +705,10 @@ function showToast(msg) {
 
 // ---------- Bauen ----------
 const BUILD_KINDS = [
-  { kind: 'city', btn: 'btnCity', label: '🏙 Stadt', key: '1' },
-  { kind: 'fort', btn: 'btnFort', label: '🛡 Festung', key: '2' },
-  { kind: 'port', btn: 'btnPort', label: '⚓ Hafen', key: '3' },
-  { kind: 'factory', btn: 'btnFactory', label: '🏭 Fabrik', key: '4' },
+  { kind: 'city', btn: 'btnCity', label: 'Stadt', icon: 'images/buildings/city.png', key: '1' },
+  { kind: 'fort', btn: 'btnFort', label: 'Festung', icon: 'images/buildings/fort.png', key: '2' },
+  { kind: 'port', btn: 'btnPort', label: 'Hafen', icon: 'images/buildings/port.png', key: '3' },
+  { kind: 'factory', btn: 'btnFactory', label: 'Fabrik', icon: 'images/buildings/factory.png', key: '4' },
 ];
 const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik' };
 
@@ -727,8 +727,11 @@ function updateBuildButtons() {
   // Im Fabrik-Baumodus den Radius der eigenen Fabriken deutlich hervorheben
   if (renderer) renderer.factoryHint = buildMode === 'factory';
 }
+function buildBtnHtml(bk, cost) {
+  return `<img class="build-icon" src="${bk.icon}" alt="">${bk.label} (${cost}€)`;
+}
 for (const bk of BUILD_KINDS) {
-  $(bk.btn).textContent = `${bk.label} (${BUILD_COSTS[bk.kind]}€)`;
+  $(bk.btn).innerHTML = buildBtnHtml(bk, BUILD_COSTS[bk.kind]);
   $(bk.btn).addEventListener('click', () => setBuildMode(bk.kind));
 }
 
@@ -736,7 +739,7 @@ for (const bk of BUILD_KINDS) {
 function updateBuildPrices() {
   if (!game) return;
   for (const bk of BUILD_KINDS) {
-    $(bk.btn).textContent = `${bk.label} (${game.buildCostOf(myIdx, bk.kind)}€)`;
+    $(bk.btn).innerHTML = buildBtnHtml(bk, game.buildCostOf(myIdx, bk.kind));
   }
 }
 

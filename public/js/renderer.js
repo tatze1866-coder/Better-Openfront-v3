@@ -34,6 +34,17 @@ function fmt(n) {
   return String(n);
 }
 
+// Gebaeude-Badge-Bilder (Wappen-Icons). Werden einmal geladen und dann fuer
+// Bau-Menue UND Karten-Icons wiederverwendet; das Zeichnen wartet nicht auf
+// das Laden (Image.complete wird pro Frame geprueft), es blinkt hoechstens
+// beim allerersten Frame ein Fallback (Kreis in Spielerfarbe).
+const BUILDING_ICONS = {};
+for (const kind of ['city', 'fort', 'port', 'factory']) {
+  const im = new Image();
+  im.src = `images/buildings/${kind}.png`;
+  BUILDING_ICONS[kind] = im;
+}
+
 export class Renderer {
   constructor(canvas, game) {
     this.canvas = canvas;
@@ -448,63 +459,33 @@ export class Renderer {
       ctx.restore();
     }
 
-    // Gebaeude-Icons: erst eine weisse Silhouette als Kontrast zum Untergrund,
-    // darin dasselbe Motiv kleiner in Spielerfarbe. Die Silhouetten sind bewusst
-    // gut unterscheidbar (Haeuserzeile / Turm / Anker / Halle mit Schornstein),
-    // denn bei kleinem Zoom sind das nur wenige Pixel.
+    // Gebaeude-Icons: Wappen-Badge-Bild (Stadt/Festung/Hafen/Fabrik), umrandet
+    // von einem Ring in Spielerfarbe (zeigt den Besitzer auch bei kleinem Zoom).
+    // Solange ein Bild noch nicht geladen ist, zeichnen wir ersatzweise einen
+    // einfachen gefuellten Kreis in Spielerfarbe.
+    const ICON_R = 3.4; // Radius des Icons in Kartenzellen (~wie vorher)
     for (const b of g.buildings) {
       const x = cx(b.cell), y = cy(b.cell);
       const col = b.owner >= 0 ? g.players[b.owner].color : '#888';
       // Im Aufbau: Icon halbtransparent, darunter ein kleiner Fortschrittsbalken
       const deploying = g.underConstruction(b);
       if (deploying) ctx.globalAlpha = 0.45;
-      if (b.kind === 'city') {
-        // Haeuserzeile: drei unterschiedlich hohe Haeuser
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - 2.9, y - 1, 2, 3.6);
-        ctx.fillRect(x - 1.1, y - 2.7, 2.2, 5.3);
-        ctx.fillRect(x + 0.9, y - 1.7, 2, 4.3);
-        ctx.fillStyle = col;
-        ctx.fillRect(x - 2.45, y - 0.5, 1.1, 2.6);
-        ctx.fillRect(x - 0.65, y - 2.2, 1.3, 4.3);
-        ctx.fillRect(x + 1.35, y - 1.2, 1.1, 3.3);
-      } else if (b.kind === 'fort') {
-        // Turm mit Zinnen
-        ctx.fillStyle = '#ffffff';
+
+      // Besitzer-Ring als Kontrast-/Farbtraeger hinter dem Badge
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(x, y, ICON_R, 0, Math.PI * 2);
+      ctx.fill();
+
+      const im = BUILDING_ICONS[b.kind];
+      if (im && im.complete && im.naturalWidth > 0) {
+        const d = ICON_R * 1.8; // Badge etwas kleiner als der Ring darunter
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(x, y, 2.9, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = col;
-        ctx.fillRect(x - 1.6, y - 1.1, 3.2, 3.1);      // Turmkoerper
-        ctx.fillRect(x - 1.6, y - 2, 0.9, 1);          // Zinne links
-        ctx.fillRect(x - 0.45, y - 2, 0.9, 1);         // Zinne mitte
-        ctx.fillRect(x + 0.7, y - 2, 0.9, 1);          // Zinne rechts
-      } else if (b.kind === 'port') {
-        // Anker auf einer Raute
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.moveTo(x, y - 3); ctx.lineTo(x + 3, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 3, y);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = col;
-        ctx.beginPath();                                // Ring oben
-        ctx.arc(x, y - 1.5, 0.75, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillRect(x - 0.35, y - 1.2, 0.7, 3);        // Schaft
-        ctx.fillRect(x - 1.4, y - 0.6, 2.8, 0.6);       // Querbalken
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 0.7;
-        ctx.beginPath();                                // Flunken (Bogen unten)
-        ctx.moveTo(x - 1.7, y + 0.9);
-        ctx.quadraticCurveTo(x, y + 3.1, x + 1.7, y + 0.9);
-        ctx.stroke();
-      } else if (b.kind === 'factory') {
-        // Halle mit Schornstein (Schornstein ragt heraus -> klare Silhouette)
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - 2.7, y - 1.7, 5.4, 4.3);
-        ctx.fillRect(x + 0.7, y - 3.4, 1.8, 2);
-        ctx.fillStyle = col;
-        ctx.fillRect(x - 2.1, y - 1.1, 4.2, 3.1);       // Halle
-        ctx.fillRect(x + 1.05, y - 3, 1.1, 1.9);        // Schornstein
+        ctx.arc(x, y, ICON_R * 0.92, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(im, x - d / 2, y - d / 2, d, d);
+        ctx.restore();
       }
       if (deploying) {
         const t = Math.min(1, (g.turnNo - b.built) / BUILD_DEPLOY_TICKS);
