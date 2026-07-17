@@ -364,6 +364,13 @@ Achievements.onUnlock((fam, tierIdx) => {
   }
 });
 
+// Reset-Knopf im Erfolge-Panel: nur zum Testen, setzt ALLE Fortschritte auf 0
+$('btnAchReset').addEventListener('click', () => {
+  if (!confirm(t('achResetConfirm'))) return;
+  Achievements.resetAll();
+  updateAchievementsPanel();
+});
+
 // ---------- Menü ----------
 let soloLevel = 1, lobbyLevel = 1;
 
@@ -835,7 +842,8 @@ function checkGameEnd() {
       text = game.winners.length > 1 ? `Das Bündnis ${names} hat gewonnen.` : `${names} hat gewonnen.`;
     }
     // Online: gemeinsam zurück in die Lobby (oder ganz raus ins Menü). Solo: nur Menü.
-    showOverlay(title, text, online ? ['btnBackToLobby', 'btnBackToMenu'] : ['btnBackToMenu']);
+    showOverlay(title, text, online ? ['btnBackToLobby', 'btnBackToMenu'] : ['btnBackToMenu'],
+      Achievements.sessionUnlocksHtml());
     stopLocalLoop();
   } else if (me && !me.alive && !deadShown) {
     // Eigener Tod, während das Spiel weiterläuft: Wahl zwischen Zuschauen und
@@ -849,10 +857,12 @@ function checkGameEnd() {
 // Alle Overlay-Buttons, die situationsabhängig ein-/ausgeblendet werden
 const OVERLAY_BUTTONS = ['btnSpectate', 'btnWaitLobby', 'btnBackToLobby', 'btnBackToMenu'];
 
-// Overlay mit Titel/Text zeigen und genau die übergebenen Buttons einblenden
-function showOverlay(title, text, buttons = []) {
+// Overlay mit Titel/Text zeigen und genau die übergebenen Buttons einblenden.
+// achHtml (optional) zeigt darunter die in dieser Runde freigeschalteten Erfolge.
+function showOverlay(title, text, buttons = [], achHtml = '') {
   $('overlayTitle').textContent = title;
   $('overlayText').textContent = text;
+  $('overlayAchievements').innerHTML = achHtml;
   for (const id of OVERLAY_BUTTONS) $(id).classList.toggle('hidden', !buttons.includes(id));
   $('overlay').classList.remove('hidden');
 }
