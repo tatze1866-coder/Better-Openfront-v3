@@ -1248,7 +1248,79 @@ body.no-anim button { transition: none; }
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(212, 175, 106, 0.25);
 }
-.ach-list {
+.ach-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(212, 175, 106, 0.25);
+}
+.ach-summary { margin: 0; padding: 0; border: none; }
+.ach-reset-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  background: linear-gradient(180deg, #1c2f45, #131f2f);
+  border: 1px solid #33465e;
+  color: #9fb0c3;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.ach-reset-btn:hover { background: linear-gradient(180deg, #4a2020, #2a1414); border-color: #a35a5a; color: #f0c8c8; }
+
+/* ---------- Runden-Erfolge (Sieg/Niederlage-Overlay) ---------- */
+.round-achievements {
+  margin: 14px auto 0;
+  max-width: 360px;
+  text-align: left;
+}
+.ra-heading {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: #d4af6a;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.ra-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.ra-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #f0e6c8;
+  background: rgba(212, 175, 106, 0.08);
+  border: 1px solid rgba(212, 175, 106, 0.25);
+  border-radius: 5px;
+  padding: 5px 9px;
+}
+.ru-icon { flex-shrink: 0; }
+.ru-tier {
+  margin-left: auto;
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  color: #1a2635;
+  background: linear-gradient(180deg, #d4af6a, #a3813f);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
   display: flex;
   flex-direction: column;
   gap: 6px;

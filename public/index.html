@@ -280,6 +280,7 @@
       <div class="panel">
         <h1 id="overlayTitle"></h1>
         <p id="overlayText"></p>
+        <div id="overlayAchievements"></div>
         <!-- Buttons werden je nach Situation (Tod / Warten / Spielende) per JS
              ein- und ausgeblendet, siehe checkGameEnd() in main.js -->
         <div class="overlay-buttons">
@@ -403,7 +404,10 @@
         </div>
 
         <div class="profile-panel hidden" data-panel="achievements">
-          <div class="ach-summary" id="achievementsSummary"></div>
+          <div class="ach-summary-row">
+            <div class="ach-summary" id="achievementsSummary"></div>
+            <button id="btnAchReset" class="ach-reset-btn" type="button" data-i18n-title="achResetBtnTitle" title="Alle Erfolge zurücksetzen (nur zum Testen)">↺</button>
+          </div>
           <div class="ach-list" id="achievementsList"></div>
         </div>
       </div>
