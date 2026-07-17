@@ -1238,6 +1238,115 @@ body.no-anim button { transition: none; }
 }
 .profile-avatar-info input[type="text"]:focus { border-color: #d4af6a; }
 
+/* ---------- Erfolge-Panel ---------- */
+.ach-summary {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  color: #d4af6a;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(212, 175, 106, 0.25);
+}
+.ach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ach-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(212, 175, 106, 0.15);
+  border-radius: 6px;
+}
+.ach-row.ach-maxed {
+  border-color: rgba(212, 175, 106, 0.55);
+  background: rgba(212, 175, 106, 0.08);
+}
+.ach-icon {
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1;
+}
+.ach-info { flex: 1; min-width: 0; }
+.ach-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ach-name {
+  font-family: 'Cinzel', serif;
+  font-size: 12.5px;
+  letter-spacing: 0.2px;
+  color: #f0e6c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ach-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #9fb0c3;
+  font-variant-numeric: tabular-nums;
+}
+.ach-maxed .ach-count { color: #d4af6a; }
+.ach-bar {
+  margin-top: 4px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.ach-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b6ea5, #d4af6a);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+.ach-maxed .ach-bar-fill { background: linear-gradient(90deg, #d4af6a, #f0e6c8); }
+.ach-desc {
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: #6f7f92;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ach-tiers {
+  flex-shrink: 0;
+  display: flex;
+  gap: 3px;
+}
+.ach-dot {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-family: 'Cinzel', serif;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(212, 175, 106, 0.25);
+  color: #556275;
+}
+.ach-dot.done {
+  background: linear-gradient(180deg, #d4af6a, #a3813f);
+  border-color: #f0e6c8;
+  color: #1a2635;
+}
+@media (max-width: 640px) {
+  .ach-desc { display: none; }
+  .ach-tiers { gap: 2px; }
+  .ach-dot { width: 15px; height: 15px; font-size: 8px; }
+}
+
 @media (max-width: 640px) {
   .profile-dialog { flex-direction: column; height: min(600px, 88vh); }
   .profile-sidebar {

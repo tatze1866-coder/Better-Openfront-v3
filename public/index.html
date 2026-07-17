@@ -358,6 +358,7 @@
         <button class="profile-nav-btn" type="button" data-panel="skins" data-i18n="profileNavSkins">Skins</button>
         <button class="profile-nav-btn" type="button" data-panel="stats" data-i18n="profileNavStats">Statistiken</button>
         <button class="profile-nav-btn" type="button" data-panel="matchhistory" data-i18n="profileNavHistory">Spielverlauf</button>
+        <button class="profile-nav-btn" type="button" data-panel="achievements" data-i18n="profileNavAchievements">Erfolge</button>
       </div>
 
       <div class="profile-content">
@@ -399,6 +400,11 @@
 
         <div class="profile-panel hidden" data-panel="matchhistory">
           <p class="hint settings-hint" data-i18n="profileHistorySoon">Noch keine gespeicherten Spiele – der Spielverlauf kommt in einem späteren Update.</p>
+        </div>
+
+        <div class="profile-panel hidden" data-panel="achievements">
+          <div class="ach-summary" id="achievementsSummary"></div>
+          <div class="ach-list" id="achievementsList"></div>
         </div>
       </div>
     </div>
