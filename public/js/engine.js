@@ -146,9 +146,9 @@ export const PLAYER_COLORS = [
 // – er expandiert langsam ins Neutrale, baut nichts, fährt keine Boote und
 // greift Spieler nur an, wenn er haushoch überlegen ist. Davon gibt es viele.
 export const BOT_LEVELS = [
-  { name: 'Leicht', icon: '🟢', interval: 40, minTroops: 250, ratioN: 0.35, ratioE: 0.4, threshold: 1.5, allyAccept: 0.9, city: false, fort: false, boatMin: 700 },
-  { name: 'Mittel', icon: '🟡', interval: 25, minTroops: 80, ratioN: 0.45, ratioE: 0.55, threshold: 1.1, allyAccept: 0.6, city: true, fort: false, boatMin: 300 },
-  { name: 'Schwer', icon: '🔴', interval: 12, minTroops: 60, ratioN: 0.5, ratioE: 0.6, threshold: 0.95, allyAccept: 0.3, city: true, fort: true, boatMin: 200 },
+  { name: 'Leicht', icon: '🟢', interval: 26, minTroops: 150, ratioN: 0.45, ratioE: 0.5, threshold: 1.1, allyAccept: 0.75, city: false, fort: false, boatMin: 450 },
+  { name: 'Mittel', icon: '🟡', interval: 13, minTroops: 45, ratioN: 0.55, ratioE: 0.65, threshold: 0.75, allyAccept: 0.4, city: true, fort: false, boatMin: 170 },
+  { name: 'Schwer', icon: '🔴', interval: 5, minTroops: 25, ratioN: 0.6, ratioE: 0.72, threshold: 0.55, allyAccept: 0.15, city: true, fort: true, boatMin: 100 },
   { name: 'Bot', icon: '🤖', interval: 60, minTroops: 300, ratioN: 0.35, ratioE: 0.35, threshold: 3.0, allyAccept: 0.95, city: false, fort: false, boatMin: 1e9 },
 ];
 export const WEAK_BOT_LEVEL = 3;     // Index des Masse-Bot-Profils
@@ -1053,7 +1053,12 @@ export class Game {
           if (isBoat) target.done = true; // Transportschiffe sinken nach einem Treffer
           else {
             target.dmg++;
-            if (target.dmg >= this.warshipMaxHp(target)) target.dead = true;
+            if (target.dmg >= this.warshipMaxHp(target)) {
+              target.dead = true;
+              // Melden, wem das Kriegsschiff gehoerte – der Client spielt
+              // dafuer einen Ton ab (siehe showFeedEvents in main.js).
+              this.feedEvents.push({ t: 'warshipLost', p: target.owner, by: w.owner });
+            }
           }
         }
       }
