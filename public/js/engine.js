@@ -1677,23 +1677,40 @@ export class Game {
       // der in processAttacks() die Eroberungskosten bestimmt. Ein Gegner kurz
       // vor der Ausloeschung wird zusaetzlich bevorzugt: sein ganzes restliches
       // Land faellt beim Todesstoss auf einen Schlag zu.
-      let best = null, bestScore = -Infinity, bestDensity = 0;
+      //
+      // Zusaetzlich: Momentane Schwaeche ausnutzen. committedTroopsOf() zaehlt
+      // Truppen, die der Nachbar gerade in eigenen Angriffen/Booten gebunden
+      // hat (this.attacks[].pool, this.boats[].troops) – p.troops selbst ist
+      // ja schon beim Losschicken um diese Menge gesunken (siehe 'attack'/
+      // 'boat' in applyIntent). Ein hoher gebundener Anteil heisst: der
+      // Nachbar hat sich gerade woanders verausgabt und ist zuhause duenn
+      // verteidigt – genau der Moment zum Zuschlagen.
+      let best = null, bestScore = -Infinity, bestDensity = 0, bestExposed = 0;
       for (const o of neighborOwners) {
         if (o < 0) continue;
         const e = this.players[o];
         if (!e.alive || this.isAllied(p.idx, o)) continue;
+        const committed = this.committedTroopsOf(o);
+        const totalForce = e.troops + committed;
+        const exposedFrac = totalForce > 0 ? committed / totalForce : 0;
         const density = e.troops / Math.max(1, e.territory);
         const finishBonus = e.territory < 350 ? 2.5 : 1;
-        const score = finishBonus / (density + 0.4);
-        if (score > bestScore) { bestScore = score; best = e; bestDensity = density; }
+        // Bis zu 4x Bonus, wenn (fast) die gesamte Streitmacht des Nachbarn
+        // gerade anderswo gebunden ist.
+        const vulnBonus = 1 + exposedFrac * 3;
+        const score = finishBonus * vulnBonus / (density + 0.4);
+        if (score > bestScore) { bestScore = score; best = e; bestDensity = density; bestExposed = exposedFrac; }
       }
       if (best) {
         // Angriff lohnt sich, wenn unser eingesetzter Pool die geschaetzten
         // Frontkosten mehrfach decken kann (nicht nur "mehr Truppen insgesamt
         // als der Gegner" – bei duennem Land reicht auch klare Unterzahl).
+        // Ist der Nachbar gerade anderweitig gebunden, reicht sogar deutliche
+        // eigene Unterzahl (effektive Schwelle sinkt bis auf ein Viertel).
         const estCellCost = ENEMY_COST_BASE + bestDensity * ENEMY_COST_DENSITY;
         const pool = p.troops * L.ratioE;
-        if (pool > estCellCost * 6 && p.troops > best.troops * L.threshold) {
+        const effectiveThreshold = L.threshold * (1 - bestExposed * 0.75);
+        if (pool > estCellCost * 6 && p.troops > best.troops * effectiveThreshold) {
           this.applyIntent({ p: p.idx, type: 'attack', target: best.idx, ratio: L.ratioE });
           return;
         }
