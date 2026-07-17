@@ -232,6 +232,19 @@ function playerName() {
   return ($('nameInput').value.trim() || 'Spieler').slice(0, 16);
 }
 
+// Profil-Button oben rechts zeigt live denselben Namen wie das Username-Feld.
+function updateProfileName() {
+  $('profileName').textContent = playerName();
+}
+updateProfileName();
+$('nameInput').addEventListener('input', updateProfileName);
+// Noch keine echte Profilseite -> Klick springt zum Username-Feld, wo der
+// Name geaendert werden kann.
+$('profileBtn').addEventListener('click', () => {
+  $('nameInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('nameInput').focus();
+});
+
 // ---------- Menü ----------
 let soloLevel = 1, lobbyLevel = 1;
 
