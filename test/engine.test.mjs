@@ -840,6 +840,39 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     !gv.isAllied(0, 1) && !gv.allyRequests.has('0:1'));
 }
 
+// ---- Spiel 12h: Ereignis-Feed & Verräter ----
+{
+  const gf = newGame(81);
+  while (gf.phase === 'spawn') gf.turn([]);
+
+  // Neuer Angriff erzeugt ein Feed-Event (im selben Tick sichtbar)
+  gf.turn([{ p: 0, type: 'attack', target: 1, ratio: 0.2 }]);
+  ok('Feed: neuer Angriff gemeldet', gf.feedEvents.some(e => e.t === 'atk' && e.p === 1 && e.by === 0));
+
+  // Eliminierung meldet Opfer UND Verursacher
+  gf.feedEvents.length = 0;
+  gf.eliminate(gf.players[2], 0);
+  ok('Feed: Eliminierung mit Verursacher', gf.feedEvents.some(e => e.t === 'elim' && e.p === 2 && e.by === 0));
+
+  // Allianzbruch: Brecher wird als Verräter markiert und gemeldet
+  gf.alliances.add(gf.allianceKey(0, 1));
+  gf.feedEvents.length = 0;
+  gf.applyIntent({ p: 0, type: 'unally', target: 1 });
+  ok('Verräter: Allianzbrecher markiert', gf.isTraitor(0) && !gf.isTraitor(1));
+  ok('Feed: Allianzbruch gemeldet', gf.feedEvents.some(e => e.t === 'unally' && e.a === 0 && e.b === 1));
+
+  // Bots verweigern Verrätern die Allianz, solange die Markierung hält
+  gf.allyRequests.add('0:1');
+  for (let i = 0; i < 30; i++) gf.turn([]);
+  ok('Bot lehnt Verräter-Anfrage ab', !gf.isAllied(0, 1) && !gf.allyRequests.has('0:1'));
+
+  // Ohne bestehende Allianz macht 'unally' NICHT zum Verräter
+  const gn2 = newGame(82);
+  while (gn2.phase === 'spawn') gn2.turn([]);
+  gn2.applyIntent({ p: 0, type: 'unally', target: 1 });
+  ok('Kein Verrat ohne bestehende Allianz', !gn2.isTraitor(0));
+}
+
 // ---- Spiel 13: Kennwerte aus der Referenz (Bevölkerung, Stadt, Festung) ----
 {
   const gc = newGame(7);

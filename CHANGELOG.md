@@ -3,6 +3,16 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.15.0] – 2026-07-17
+
+### Hinzugefügt
+- **Ereignis-Feed** (unten links): meldet Eliminierungen („X wurde von Y
+  ausgelöscht"), Angriffe auf dich und Allianzen/Allianzbrüche anderer –
+  gerade mit vielen Bots verliert man so nicht mehr den Überblick.
+- **Verräter-Mechanik**: Wer eine Allianz bricht, gilt 90 Sekunden als
+  Verräter – markiert mit 🗡 in Rangliste und Tooltip. Bots und Nationen
+  verweigern Verrätern in dieser Zeit jede neue Allianz.
+
 ## [0.14.2] – 2026-07-17
 
 ### Geändert

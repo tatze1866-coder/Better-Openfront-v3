@@ -57,6 +57,7 @@ const CLASH_SPEED_CAP = 5;           // Gegenangriffe: max. Beschleunigung der s
 // bevorzugt zurück – Angriffe bleiben damit nie "gratis".
 const GRUDGE_TICKS = 600;            // 60s: so lange hält der Groll
 const REVENGE_THRESHOLD = 0.8;       // Gegenschlag schon ab 80% der Truppen des Angreifers
+const TRAITOR_TICKS = 900;           // 90s: so lange gilt ein Allianzbrecher als Verräter
 const ATTACK_SPEED_CAP = 4;          // Übermacht: max. Beschleunigung nach Pool/haltende Truppen
 const WIN_FRACTION = 0.7;            // 70% des Landes = Sieg
 
@@ -184,6 +185,10 @@ export class Game {
     // Einnahmen aus Handel/Zügen in diesem Tick: { p, amount } – nur fürs HUD
     // (Geld-Popups), wird jede Runde geleert und beeinflusst die Simulation nicht.
     this.moneyEvents = [];
+    // Ereignisse dieses Ticks fürs HUD (Ereignis-Feed): Eliminierungen ('elim'),
+    // neue Angriffe ('atk'), Allianzen ('ally') und Allianzbrüche ('unally').
+    // Wie moneyEvents rein informativ und jede Runde geleert.
+    this.feedEvents = [];
     this.buildings = [];           // Städte, Festungen, Häfen, Fabriken
     this.buildingAt = new Map();   // Zelle -> Gebäude
     this.alliances = new Set();    // "a:b" (a < b)
@@ -223,6 +228,7 @@ export class Game {
         territory: 0,
         lastAggressor: -1,   // wer diesen Spieler zuletzt angegriffen hat
         grudgeUntil: 0,      // bis zu welchem Tick der Groll hält (Vergeltung)
+        traitorUntil: 0,     // bis zu welchem Tick dieser Spieler als Verräter gilt
         cities: 0,
         forts: 0,
         ports: 0,
@@ -262,6 +268,8 @@ export class Game {
   // immer denselben Schluessel hat, egal in welcher Reihenfolge gefragt wird.
   allianceKey(a, b) { return a < b ? `${a}:${b}` : `${b}:${a}`; }
   isAllied(a, b) { return this.alliances.has(this.allianceKey(a, b)); }
+  // Gilt der Spieler gerade als Verräter (hat kürzlich eine Allianz gebrochen)?
+  isTraitor(idx) { return this.players[idx].traitorUntil > this.turnNo; }
 
   // Ist das Gebaeude noch im Aufbau? Frisch gebaute Gebaeude wirken erst nach
   // BUILD_DEPLOY_TICKS (5s). Gebaeude ohne built-Zeitstempel (z.B. direkt in
@@ -406,6 +414,8 @@ export class Game {
           existing.pool += troops; // Nachschub für die laufende Front
         } else {
           this.attacks.push({ attacker: p.idx, target, pool: troops, frontier: new Set(), cd: 1, stall: 0 });
+          // Neuer Angriff auf einen Spieler -> Meldung im Ereignis-Feed
+          if (target >= 0) this.feedEvents.push({ t: 'atk', p: target, by: p.idx });
         }
         break;
       }
@@ -483,6 +493,7 @@ export class Game {
           this.allyRequests.delete(`${t}:${p.idx}`);
           this.allyRequests.delete(`${p.idx}:${t}`);
           this.alliances.add(this.allianceKey(p.idx, t));
+          this.feedEvents.push({ t: 'ally', a: p.idx, b: t });
           // Laufende Angriffe zwischen den Partnern abbrechen (Truppen zurück)
           for (const atk of this.attacks) {
             if ((atk.attacker === p.idx && atk.target === t) || (atk.attacker === t && atk.target === p.idx)) {
@@ -495,10 +506,16 @@ export class Game {
         }
         break;
       }
-      // Allianz aufkuendigen (und offene Anfragen in beide Richtungen loeschen)
+      // Allianz aufkuendigen (und offene Anfragen in beide Richtungen loeschen).
+      // Wer eine BESTEHENDE Allianz bricht, gilt eine Weile als Verräter:
+      // Bots verweigern ihm Allianzen (siehe botAct) und er wird im HUD markiert.
       case 'unally': {
         const t = it.target | 0;
         if (!this.players[t]) return;
+        if (this.isAllied(p.idx, t)) {
+          p.traitorUntil = this.turnNo + TRAITOR_TICKS;
+          this.feedEvents.push({ t: 'unally', a: p.idx, b: t });
+        }
         this.alliances.delete(this.allianceKey(p.idx, t));
         this.allyRequests.delete(`${p.idx}:${t}`);
         this.allyRequests.delete(`${t}:${p.idx}`);
@@ -676,12 +693,15 @@ export class Game {
         defender.grudgeUntil = this.turnNo + GRUDGE_TICKS;
       }
       this.setOwner(cell, boat.owner);
-      if (defender && defender.territory === 0) this.eliminate(defender);
+      if (defender && defender.territory === 0) this.eliminate(defender, boat.owner);
       if (pool >= 1) {
         // Brückenkopf: Rest kämpft als normaler Angriff weiter
         const existing = this.attacks.find(a => a.attacker === boat.owner && a.target === o);
         if (existing) existing.pool += pool;
-        else this.attacks.push({ attacker: boat.owner, target: o, pool, frontier: new Set(), cd: 1, stall: 0 });
+        else {
+          this.attacks.push({ attacker: boat.owner, target: o, pool, frontier: new Set(), cd: 1, stall: 0 });
+          if (o >= 0) this.feedEvents.push({ t: 'atk', p: o, by: boat.owner });
+        }
       }
     }
     this.boats = this.boats.filter(b => !b.done);
@@ -1056,6 +1076,10 @@ export class Game {
   // die Siegbedingung pruefen. In der Spawn-Phase wird nur hochgezaehlt.
   turn(intents) {
     if (this.phase === 'ended') return;
+    // HUD-Event-Puffer VOR den Intents leeren – Angriffs-/Allianz-Events
+    // entstehen schon beim Anwenden der Intents (applyIntent).
+    this.moneyEvents.length = 0;
+    this.feedEvents.length = 0;
     for (const it of intents) this.applyIntent(it);
 
     if (this.phase === 'spawn') {
@@ -1064,7 +1088,6 @@ export class Game {
       return;
     }
 
-    this.moneyEvents.length = 0;
     this.botThink();
     this.economy();
     this.processBoats();
@@ -1176,7 +1199,7 @@ export class Game {
         this.setOwner(cell, atk.attacker);
         captured++;
         if (defender && defender.territory === 0) {
-          this.eliminate(defender);
+          this.eliminate(defender, atk.attacker);
           break;
         }
       }
@@ -1203,7 +1226,9 @@ export class Game {
 
   // Einen Spieler ausscheiden lassen: als tot markieren und seine laufenden
   // Angriffe, Boote und offenen Allianz-Anfragen aufraeumen.
-  eliminate(p) {
+  // byIdx = wer den letzten Schlag gefuehrt hat (fuer den Ereignis-Feed).
+  eliminate(p, byIdx = -1) {
+    this.feedEvents.push({ t: 'elim', p: p.idx, by: byIdx });
     p.alive = false;
     p.troops = 0;
     for (const atk of this.attacks) {
@@ -1350,11 +1375,11 @@ export class Game {
     const grudge = p.grudgeUntil > this.turnNo ? p.lastAggressor : -1;
 
     // Allianz-Anfragen beantworten (Zustimmung je nach Schwierigkeit).
-    // Wer uns gerade bekriegt, bekommt grundsätzlich KEINE Allianz.
+    // Wer uns gerade bekriegt oder als Verräter gilt, bekommt KEINE Allianz.
     for (let x = 0; x < this.players.length; x++) {
       const key = `${x}:${p.idx}`;
       if (this.allyRequests.has(key)) {
-        if (x === grudge) this.allyRequests.delete(key);
+        if (x === grudge || this.isTraitor(x)) this.allyRequests.delete(key);
         else if (this.rng() < L.allyAccept) this.applyIntent({ p: p.idx, type: 'ally', target: x });
         else this.allyRequests.delete(key);
       }

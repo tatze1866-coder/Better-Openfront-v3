@@ -267,6 +267,33 @@ button.primary:hover { background: #f4845f; }
 #ratioLabel { width: 44px; text-align: right; font-weight: 600; color: #f4a261; }
 #hudBottom .hint { margin: 0; }
 
+/* Ereignis-Feed unten links: Eliminierungen, Angriffe auf dich, Verrat.
+   Neustes unten; jede Meldung verschwindet nach ~9s (JS entfernt sie). */
+#eventFeed {
+  position: absolute; left: 12px; bottom: 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  max-width: 340px;
+  pointer-events: none;
+  z-index: 8;
+}
+.feed-item {
+  background: rgba(22, 40, 60, 0.88);
+  border: 1px solid #35547a;
+  border-left: 3px solid #f4a261;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  animation: feedItem 9s ease forwards;
+}
+.feed-item.feed-bad { border-left-color: #ff8a80; }
+@keyframes feedItem {
+  0%   { opacity: 0; transform: translateX(-10px); }
+  4%   { opacity: 1; transform: translateX(0); }
+  88%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+body.no-anim .feed-item { animation: none; }
+
 /* Animationen aus (Einstellungen): dekorative Effekte stillegen. Popups und
    Balken bleiben sichtbar, bewegen sich nur nicht mehr. */
 body.no-anim .money-pop { animation: none; }

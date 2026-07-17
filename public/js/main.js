@@ -617,6 +617,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   lbHoverIdx = -1;
   $('leaderboard').innerHTML = '';
   $('lbTip').classList.add('hidden');
+  $('eventFeed').innerHTML = ''; // Feed gehört zum alten Spiel
   $('attackList').classList.add('hidden');
   // Allianz-Anfrage-Karten gehören auch zum alten Spiel -> entfernen
   for (const card of allyReqCards.values()) card.remove();
@@ -664,6 +665,7 @@ function stepTurn(intents) {
   if (!game || game.phase === 'ended') return;
   game.turn(intents);
   showMoneyPops();
+  showFeedEvents();
   if (renderer && game.dirty.length) {
     renderer.markDirty(game.dirty);
     game.dirty.length = 0;
@@ -924,6 +926,39 @@ function removeAllyCard(key) {
   if (card) { card.remove(); allyReqCards.delete(key); }
 }
 
+// ---------- Ereignis-Feed ----------
+// Meldungen unten links: Eliminierungen (alle), Angriffe auf DICH, Allianzen
+// und Allianzbrüche (Verrat). Neustes unten, max. 6 gleichzeitig, ~9s sichtbar.
+// Eigene Aktionen erscheinen nicht (dafür gibt es schon Toasts).
+const FEED_MS = 9000;
+const FEED_MAX = 6;
+function pushFeed(text, bad) {
+  const box = $('eventFeed');
+  const el = document.createElement('div');
+  el.className = 'feed-item' + (bad ? ' feed-bad' : '');
+  el.textContent = text;
+  box.appendChild(el);
+  while (box.children.length > FEED_MAX) box.firstChild.remove();
+  setTimeout(() => el.remove(), FEED_MS);
+}
+function showFeedEvents() {
+  if (!game || !game.feedEvents.length) return;
+  const nm = i => (i >= 0 && game.players[i] ? game.players[i].name : '?');
+  for (const e of game.feedEvents) {
+    if (e.t === 'elim' && e.p !== myIdx) {
+      pushFeed(e.by >= 0
+        ? `💀 ${nm(e.p)} wurde von ${nm(e.by)} ausgelöscht`
+        : `💀 ${nm(e.p)} wurde ausgelöscht`, e.by === myIdx ? false : true);
+    } else if (e.t === 'atk' && e.p === myIdx) {
+      pushFeed(`⚔ ${nm(e.by)} greift dich an!`, true);
+    } else if (e.t === 'ally' && e.a !== myIdx && e.b !== myIdx) {
+      pushFeed(`🤝 ${nm(e.a)} und ${nm(e.b)} sind jetzt verbündet`, false);
+    } else if (e.t === 'unally' && e.a !== myIdx) {
+      pushFeed(`🗡 ${nm(e.a)} hat die Allianz mit ${nm(e.b)} gebrochen!`, true);
+    }
+  }
+}
+
 // ---------- HUD ----------
 // Einnahmen aus Handel & Zügen poppen über der Geldanzeige auf: das Neuste
 // steht direkt über dem Geld, Ältere rutschen nach oben (max. 5 gleichzeitig),
@@ -1032,6 +1067,7 @@ function updateLeaderboard() {
     if (p.idx !== myIdx && game.isAllied(myIdx, p.idx)) suffix = ' 🤝';
     else if (p.idx !== myIdx && game.allyRequests.has(`${p.idx}:${myIdx}`)) suffix = ' 🤝?';
     else if (p.idx !== myIdx && game.allyRequests.has(`${myIdx}:${p.idx}`)) suffix = ' ⏳';
+    if (game.isTraitor(p.idx)) suffix += ' 🗡'; // Verräter (Allianzbrecher)
     r._name.textContent = p.name + suffix;
     r._val.textContent = `${(p.territory / game.map.landCount * 100).toFixed(1)}% · ${fmt(p.troops)}`;
   }
@@ -1105,6 +1141,12 @@ function updateLbTip() {
   }
   tip.appendChild(builds);
 
+  if (game.isTraitor(p.idx)) {
+    const d = document.createElement('div');
+    d.className = 'tip-dead';
+    d.textContent = 'Verräter 🗡 (hat eine Allianz gebrochen)';
+    tip.appendChild(d);
+  }
   if (!p.alive) {
     const d = document.createElement('div');
     d.className = 'tip-dead';
