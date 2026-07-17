@@ -299,8 +299,9 @@ button.primary:hover { background: #f4845f; }
 }
 
 .build-row { display: flex; gap: 8px; width: 100%; }
-.build-row button { margin-top: 0; padding: 7px 10px; font-size: 13px; flex: 1; }
+.build-row button { margin-top: 0; padding: 7px 10px; font-size: 13px; flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .build-row button.build-active { background: #e76f51; box-shadow: 0 0 0 2px #f4a261; }
+.build-icon { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; border-radius: 50%; }
 
 #toast {
   /* Oben mittig, unterhalb des Karten-Hover-Tooltips (top: 64px), damit sich
