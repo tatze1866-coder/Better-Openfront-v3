@@ -21,6 +21,7 @@ const settings = {
   volume: parseInt(localStorage.getItem('ofVolume') ?? '80', 10),
   animations: localStorage.getItem('ofAnimations') ?? 'on',
   fps: localStorage.getItem('ofFps') ?? 'off',
+  buildingStyle: localStorage.getItem('ofBuildingStyle') ?? 'v2',
 };
 
 // Einstellungen beim Start anwenden
@@ -50,6 +51,13 @@ function updateFpsSeg() {
   if (fpsEl) fpsEl.classList.toggle('hidden', settings.fps !== 'on');
 }
 
+// Gebäude-Grafikstil-Segment aktualisieren (altes Wappen-Set vs. neues Insel-Set)
+function updateBuildingStyleSeg() {
+  for (const btn of $('buildingStyleSeg').querySelectorAll('button[data-style]')) {
+    btn.classList.toggle('sel', btn.dataset.style === settings.buildingStyle);
+  }
+}
+
 // Lautstärke-Anzeige aktualisieren
 function updateVolumeDisplay() {
   $('volumeSlider').value = settings.volume;
@@ -61,6 +69,7 @@ function openSettings() {
   updateLangSeg();
   updateAnimSeg();
   updateFpsSeg();
+  updateBuildingStyleSeg();
   updateVolumeDisplay();
   $('settingsOverlay').classList.remove('hidden');
 }
@@ -121,6 +130,17 @@ $('fpsSeg').addEventListener('click', e => {
   settings.fps = btn.dataset.fps;
   localStorage.setItem('ofFps', settings.fps);
   updateFpsSeg();
+});
+
+// Gebäude-Grafikstil: altes Wappen-Set <-> neues Insel-Set
+$('buildingStyleSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-style]');
+  if (!btn) return;
+  settings.buildingStyle = btn.dataset.style;
+  localStorage.setItem('ofBuildingStyle', settings.buildingStyle);
+  updateBuildingStyleSeg();
+  updateBuildPrices();               // Bau-Menü-Icons neu zeichnen
+  if (renderer) renderer.buildingStyle = settings.buildingStyle; // Karten-Icons
 });
 
 // Wenn Sprache wechselt: statische Übersetzungen neu anwenden
@@ -595,6 +615,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   window.__game = game; // Debug-Zugriff (Konsole)
   const canvas = $('canvas');
   renderer = new Renderer(canvas, game);
+  renderer.buildingStyle = settings.buildingStyle;
   renderer.myIdx = myIdx;              // fuer den Fabrik-Radius der eigenen Fabriken
   window.__renderer = renderer;
   $('overlay').classList.add('hidden');
@@ -705,12 +726,19 @@ function showToast(msg) {
 
 // ---------- Bauen ----------
 const BUILD_KINDS = [
-  { kind: 'city', btn: 'btnCity', label: 'Stadt', icon: 'images/buildings/city.png', key: '1' },
-  { kind: 'fort', btn: 'btnFort', label: 'Festung', icon: 'images/buildings/fort.png', key: '2' },
-  { kind: 'port', btn: 'btnPort', label: 'Hafen', icon: 'images/buildings/port.png', key: '3' },
-  { kind: 'factory', btn: 'btnFactory', label: 'Fabrik', icon: 'images/buildings/factory.png', key: '4' },
+  { kind: 'city', btn: 'btnCity', label: 'Stadt', key: '1' },
+  { kind: 'fort', btn: 'btnFort', label: 'Festung', key: '2' },
+  { kind: 'port', btn: 'btnPort', label: 'Hafen', key: '3' },
+  { kind: 'factory', btn: 'btnFactory', label: 'Fabrik', key: '4' },
 ];
 const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik' };
+
+// Bildpfad je nach gewähltem Gebäude-Grafikstil (altes Wappen-Set / neues
+// Insel-Set). settings.buildingStyle: 'v1' (alt) oder 'v2' (neu, Default).
+function iconPath(kind) {
+  const folder = settings.buildingStyle === 'v1' ? 'images/buildings' : 'images/buildings_v2';
+  return `${folder}/${kind}.png`;
+}
 
 // Baumodus umschalten (nochmal derselbe -> aus). Danach reagiert ein Klick auf
 // die Karte mit "hier bauen" statt "angreifen".
@@ -728,7 +756,7 @@ function updateBuildButtons() {
   if (renderer) renderer.factoryHint = buildMode === 'factory';
 }
 function buildBtnHtml(bk, cost) {
-  return `<img class="build-icon" src="${bk.icon}" alt="">${bk.label} (${cost}€)`;
+  return `<img class="build-icon" src="${iconPath(bk.kind)}" alt="">${bk.label} (${cost}€)`;
 }
 for (const bk of BUILD_KINDS) {
   $(bk.btn).innerHTML = buildBtnHtml(bk, BUILD_COSTS[bk.kind]);
@@ -737,9 +765,9 @@ for (const bk of BUILD_KINDS) {
 
 // Preise steigen pro gebautem Gebäude – Buttons zeigen den aktuellen Preis
 function updateBuildPrices() {
-  if (!game) return;
   for (const bk of BUILD_KINDS) {
-    $(bk.btn).innerHTML = buildBtnHtml(bk, game.buildCostOf(myIdx, bk.kind));
+    const cost = game ? game.buildCostOf(myIdx, bk.kind) : BUILD_COSTS[bk.kind];
+    $(bk.btn).innerHTML = buildBtnHtml(bk, cost);
   }
 }
 

@@ -19,6 +19,9 @@ const dict = {
   showFpsLabel: { de: 'FPS-Anzeige', en: 'Show FPS' },
   fpsOn: { de: 'An', en: 'On' },
   fpsOff: { de: 'Aus', en: 'Off' },
+  buildingStyleLabel: { de: 'Gebäude-Grafik', en: 'Building graphics' },
+  buildingStyleOld: { de: 'Alt (Wappen)', en: 'Old (badges)' },
+  buildingStyleNew: { de: 'Neu (Inseln)', en: 'New (islands)' },
 
   // ---------- Hauptmenü ----------
   soloHeading: { de: 'Einzelspieler', en: 'Singleplayer' },

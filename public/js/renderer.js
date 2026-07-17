@@ -38,11 +38,20 @@ function fmt(n) {
 // Bau-Menue UND Karten-Icons wiederverwendet; das Zeichnen wartet nicht auf
 // das Laden (Image.complete wird pro Frame geprueft), es blinkt hoechstens
 // beim allerersten Frame ein Fallback (Kreis in Spielerfarbe).
-const BUILDING_ICONS = {};
+// Gebaeude-Badge-Bilder: zwei Sets (v1 = altes Wappen-Design, v2 = neues
+// Insel-Design), zwischen denen der Spieler in den Einstellungen wechseln
+// kann (Renderer#buildingStyle). Werden einmal geladen und dann fuer
+// Bau-Menue UND Karten-Icons wiederverwendet; das Zeichnen wartet nicht auf
+// das Laden (Image.complete wird pro Frame geprueft), es blinkt hoechstens
+// beim allerersten Frame ein Fallback (Kreis in Spielerfarbe).
+const BUILDING_ICONS = { v1: {}, v2: {} };
 for (const kind of ['city', 'fort', 'port', 'factory']) {
-  const im = new Image();
-  im.src = `images/buildings/${kind}.png`;
-  BUILDING_ICONS[kind] = im;
+  const im1 = new Image();
+  im1.src = `images/buildings/${kind}.png`;
+  BUILDING_ICONS.v1[kind] = im1;
+  const im2 = new Image();
+  im2.src = `images/buildings_v2/${kind}.png`;
+  BUILDING_ICONS.v2[kind] = im2;
 }
 // Zug-Sprite (Dampflok, passend zum Wappen-Stil der Gebaeude-Badges).
 // Die Front (Laterne/Bugräumer) zeigt im Bild nach links; beim Zeichnen wird
@@ -59,6 +68,7 @@ export class Renderer {
     // ob gerade der Fabrik-Baumodus laeuft (dann Radius deutlicher zeichnen).
     this.myIdx = -1;
     this.factoryHint = false;
+    this.buildingStyle = 'v2'; // 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
@@ -482,7 +492,7 @@ export class Renderer {
       ctx.arc(x, y, ICON_R, 0, Math.PI * 2);
       ctx.fill();
 
-      const im = BUILDING_ICONS[b.kind];
+      const im = BUILDING_ICONS[this.buildingStyle][b.kind];
       if (im && im.complete && im.naturalWidth > 0) {
         const d = ICON_R * 1.8; // Badge etwas kleiner als der Ring darunter
         ctx.save();
