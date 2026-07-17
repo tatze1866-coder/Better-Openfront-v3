@@ -1104,6 +1104,123 @@ body.no-anim button { transition: none; }
   background: linear-gradient(180deg, #3a75b5, #1d4a73);
 }
 
+/* ---------- Profil-Dialog ---------- */
+.profile-dialog {
+  position: relative;
+  width: min(760px, 94vw);
+  height: min(520px, 82vh);
+  display: flex;
+  background: linear-gradient(180deg, rgba(12, 22, 33, 0.97), rgba(10, 18, 27, 0.99));
+  border: 1px solid #d4af6a;
+  border-radius: 6px;
+  outline: 5px solid rgba(9, 16, 24, 0.55);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 6px #6b5423,
+    0 0 0 7px #d4af6a,
+    0 20px 60px rgba(0, 0, 0, 0.7);
+  animation: settingsSlideIn 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+  overflow: hidden;
+}
+
+.profile-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+}
+
+.profile-sidebar {
+  width: 190px;
+  flex-shrink: 0;
+  background: rgba(6, 12, 20, 0.5);
+  border-right: 1px solid rgba(212, 175, 106, 0.3);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 0;
+  padding: 10px 12px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.5px;
+  font-size: 13px;
+  background: linear-gradient(180deg, #1c2f45, #131f2f);
+  border: 1px solid #33465e;
+  color: #c9b98a;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.profile-nav-btn:hover { background: linear-gradient(180deg, #223a56, #182838); border-color: #6b5423; }
+.profile-nav-btn.sel {
+  background: linear-gradient(180deg, #2f6198, #173a5c);
+  border-color: #d4af6a;
+  color: #f0e6c8;
+}
+.profile-nav-emblem { width: 20px; height: 23px; flex-shrink: 0; display: block; }
+.profile-nav-emblem svg { width: 100%; height: 100%; display: block; }
+.profile-nav-btn span:not(.profile-nav-emblem) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-content {
+  flex: 1;
+  padding: 30px 34px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.profile-panel.hidden { display: none; }
+
+.profile-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+.profile-avatar-big {
+  width: 64px;
+  height: 74px;
+  flex-shrink: 0;
+  display: block;
+}
+.profile-avatar-big svg { width: 100%; height: 100%; display: block; }
+.profile-avatar-info { flex: 1; }
+.profile-avatar-info input[type="text"] {
+  background: #16283c;
+  border: 1px solid #6b5423;
+  color: #f0e6c8;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 17px;
+  margin: 0;
+}
+.profile-avatar-info input[type="text"]:focus { border-color: #d4af6a; }
+
+@media (max-width: 640px) {
+  .profile-dialog { flex-direction: column; height: min(600px, 88vh); }
+  .profile-sidebar {
+    flex-direction: row;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(212, 175, 106, 0.3);
+    padding: 10px;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .profile-nav-btn { flex-shrink: 0; width: auto; }
+  .profile-content { padding: 20px; }
+}
+
 /* FPS-Anzeige im Spiel */
 #fpsDisplay {
   position: absolute;

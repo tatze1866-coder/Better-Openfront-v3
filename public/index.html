@@ -335,16 +335,69 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <label class="settings-label" data-i18n="buildingStyleLabel">Gebäude-Grafik</label>
-        <div class="seg" id="buildingStyleSeg">
-          <button type="button" data-style="orig" class="sel" data-i18n="buildingStyleOrig">Standard (Emoji)</button>
-          <button type="button" data-style="v1" data-i18n="buildingStyleOld">Alt (Wappen)</button>
-          <button type="button" data-style="v2" data-i18n="buildingStyleNew">Neu (Inseln)</button>
-        </div>
+      <button id="btnSettingsCloseBottom" class="settings-close-btn" type="button" data-i18n="closeBtn">Schließen</button>
+    </div>
+  </div>
+
+  <!-- Profil-Dialog (Modal) -->
+  <div id="profileOverlay" class="settings-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+    <div class="profile-dialog">
+      <button id="btnProfileClose" class="settings-close profile-close" type="button" aria-label="Schließen">✕</button>
+
+      <div class="profile-sidebar">
+        <button class="profile-nav-btn sel" type="button" data-panel="player">
+          <span class="profile-nav-emblem">
+            <svg viewBox="0 0 40 46" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M20 2 L37 8 V21 C37 32 30 40 20 44 C10 40 3 32 3 21 V8 Z" fill="#0f1c2b" stroke="#d4af6a" stroke-width="2"/>
+              <path d="M20 10 C15 10 12 13 12 17 C12 22 16 25 16 28 L24 28 C24 25 28 22 28 17 C28 13 25 10 20 10 Z" fill="#3b5b8c"/>
+              <circle cx="20" cy="9" r="3.4" fill="#d4af6a"/>
+            </svg>
+          </span>
+          <span id="profileNavName">Player</span>
+        </button>
+        <button class="profile-nav-btn" type="button" data-panel="skins" data-i18n="profileNavSkins">Skins</button>
+        <button class="profile-nav-btn" type="button" data-panel="stats" data-i18n="profileNavStats">Statistiken</button>
+        <button class="profile-nav-btn" type="button" data-panel="matchhistory" data-i18n="profileNavHistory">Spielverlauf</button>
       </div>
 
-      <button id="btnSettingsCloseBottom" class="settings-close-btn" type="button" data-i18n="closeBtn">Schließen</button>
+      <div class="profile-content">
+        <div class="profile-panel" data-panel="player">
+          <div class="profile-avatar-row">
+            <span class="profile-avatar-big">
+              <svg viewBox="0 0 40 46" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M20 2 L37 8 V21 C37 32 30 40 20 44 C10 40 3 32 3 21 V8 Z" fill="#0f1c2b" stroke="#d4af6a" stroke-width="2"/>
+                <path d="M20 10 C15 10 12 13 12 17 C12 22 16 25 16 28 L24 28 C24 25 28 22 28 17 C28 13 25 10 20 10 Z" fill="#3b5b8c"/>
+                <circle cx="20" cy="9" r="3.4" fill="#d4af6a"/>
+              </svg>
+            </span>
+            <div class="profile-avatar-info">
+              <label class="settings-label" for="profileNameInput" data-i18n="profileNameLabel">Spielername</label>
+              <input id="profileNameInput" type="text" maxlength="16" placeholder="Player" autocomplete="off">
+            </div>
+          </div>
+          <p class="hint settings-hint" data-i18n="profileNameHint">Gilt für Einzel- und Mehrspieler – dasselbe Feld wie im Menü.</p>
+        </div>
+
+        <div class="profile-panel hidden" data-panel="skins">
+          <div class="settings-section">
+            <label class="settings-label" data-i18n="buildingStyleLabel">Gebäude-Grafik</label>
+            <div class="seg" id="buildingStyleSeg">
+              <button type="button" data-style="orig" class="sel" data-i18n="buildingStyleOrig">Standard (Emoji)</button>
+              <button type="button" data-style="v1" data-i18n="buildingStyleOld">Alt (Wappen)</button>
+              <button type="button" data-style="v2" data-i18n="buildingStyleNew">Neu (Inseln)</button>
+            </div>
+            <p class="hint settings-hint" data-i18n="buildingStyleHint">Gilt nur für deine eigenen Gebäude/Züge – Bots und andere Nationen bleiben beim Standard.</p>
+          </div>
+        </div>
+
+        <div class="profile-panel hidden" data-panel="stats">
+          <p class="hint settings-hint" data-i18n="profileStatsSoon">Statistiken werden noch gesammelt – hier gibt's bald Siege, Niederlagen und mehr.</p>
+        </div>
+
+        <div class="profile-panel hidden" data-panel="matchhistory">
+          <p class="hint settings-hint" data-i18n="profileHistorySoon">Noch keine gespeicherten Spiele – der Spielverlauf kommt in einem späteren Update.</p>
+        </div>
+      </div>
     </div>
   </div>
 
