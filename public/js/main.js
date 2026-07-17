@@ -137,6 +137,7 @@ $('animSeg').addEventListener('click', e => {
   localStorage.setItem('ofAnimations', settings.animations);
   updateAnimSeg();
   applyAnimations();
+  if (renderer) renderer.animations = settings.animations === 'on'; // Karten-Schimmer
 });
 
 // FPS-Anzeige
@@ -772,6 +773,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   const canvas = $('canvas');
   renderer = new Renderer(canvas, game);
   renderer.buildingStyle = settings.buildingStyle;
+  renderer.animations = settings.animations === 'on'; // Karten-Schimmer an/aus
   renderer.myIdx = myIdx;              // fuer den Fabrik-Radius der eigenen Fabriken
   window.__renderer = renderer;
   $('overlay').classList.add('hidden');

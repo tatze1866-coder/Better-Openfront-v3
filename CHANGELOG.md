@@ -3,6 +3,20 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.16.3] – 2026-07-17
+
+### Geändert
+- **Hübschere Spielwelt**: Die Karte im Spiel wirkt jetzt deutlich edler –
+  feinerer Tiefenverlauf im Wasser mit hellem „Lagunen"-Saum an den Küsten,
+  sanft pulsierende Lichtpunkte auf dem Meer (respektiert die Einstellung
+  „Animationen aus"), weichere zweistufige Reichsgrenzen mit aufgehellten
+  Innenflächen und Küstenschatten, dezente Vignette an den Bildschirmrändern.
+- **Namen auf der Karte**: Spielernamen erscheinen in der Cinzel-Schrift
+  des Menüs, weiß mit dunklem Outline und einem Farbbalken darunter.
+- **Schiffe & Badges**: Angriffs-/Boot-Badges als Pillen mit Schatten,
+  Handelsschiffe mit kleinem Segel, Transportboote und Kriegsschiffe mit
+  abgerundeten Rümpfen, Schienen etwas kontrastreicher.
+
 ## [0.16.2] – 2026-07-17
 
 ### Hinzugefügt

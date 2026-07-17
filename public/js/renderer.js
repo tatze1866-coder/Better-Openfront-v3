@@ -11,11 +11,11 @@ import { hash2 } from './rng.js';
 
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
 // Wasser wird nach Tiefe verlaufen gezeichnet (Kueste hell -> offene See dunkel).
-const WATER_SHALLOW = [68, 128, 178];
-const WATER_DEEP = [30, 66, 112];
-const NEUTRAL = [181, 173, 138];
-const NEUTRAL_EDGE = [160, 152, 118];   // etwas dunkler fuer Grenzkanten
-const SAND = [216, 203, 158];           // Strandton fuer neutrale Kuestenzellen
+const WATER_SHALLOW = [96, 170, 205];
+const WATER_DEEP = [22, 52, 94];
+const NEUTRAL = [186, 176, 138];
+const NEUTRAL_EDGE = [163, 153, 116];   // etwas dunkler fuer Grenzkanten
+const SAND = [219, 205, 156];           // Strandton fuer neutrale Kuestenzellen
 
 // Hex-Farbe ("#rrggbb") in ein [R,G,B]-Array umwandeln.
 function hexToRgb(hex) {
@@ -69,6 +69,7 @@ export class Renderer {
     this.myIdx = -1;
     this.factoryHint = false;
     this.buildingStyle = 'orig'; // 'orig' = Emoji/Formen, 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
+    this.animations = true;   // von main.js gesetzt (Einstellung "Animationen")
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
     this.selectedWarshipIds = new Set(); // per Klick/Rechteck ausgewaehlte eigene Kriegsschiffe
     this.selectRect = null; // Shift-Auswahlrechteck in Bildschirmkoordinaten ({x0,y0,x1,y1})
@@ -85,9 +86,13 @@ export class Renderer {
     this.img = this.offCtx.createImageData(w, h);
     this.imgDirty = true;   // muss img erst wieder ins Offscreen-Canvas geschrieben werden?
 
-    // Spielerfarben vorab in RGB umrechnen (normal + abgedunkelt fuer Kanten)
+    // Spielerfarben vorab in RGB umrechnen (normal + abgedunkelt fuer Kanten,
+    // + Zwischenton fuer den Grenzsaum + aufgehellt fuer die Innenflaeche)
     this.colors = game.players.map(p => hexToRgb(p.color));
     this.colorsEdge = this.colors.map(c => darken(c, 0.62));
+    this.colorsSeam = this.colors.map(c => darken(c, 0.82));
+    this.colorsLight = this.colors.map(c => [
+      Math.min(255, c[0] * 1.08) | 0, Math.min(255, c[1] * 1.08) | 0, Math.min(255, c[2] * 1.08) | 0]);
 
     // Statische Gelaende-Details (Wassertiefe + Rauschen) einmal vorberechnen
     this.computeTerrainDetail();
@@ -112,12 +117,21 @@ export class Renderer {
   resize() {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
+    // Vignette (dezente Randabdunklung) einmal pro Groesse vorberechnen,
+    // damit pro Frame nur ein fillRect noetig ist.
+    const w = this.canvas.width, h = this.canvas.height;
+    const vg = this.ctx.createRadialGradient(
+      w / 2, h / 2, Math.min(w, h) * 0.42, w / 2, h / 2, Math.hypot(w, h) / 2);
+    vg.addColorStop(0, 'rgba(6, 12, 20, 0)');
+    vg.addColorStop(1, 'rgba(6, 12, 20, 0.26)');
+    this.vignette = vg;
   }
 
   // Statische Gelaende-Details einmal vorberechnen – rein optisch, die
   // Simulation kennt weiterhin nur Wasser/Land:
-  // - depth: Wasser-Abstand zur Kueste (1..6, BFS) fuer den Tiefenverlauf
+  // - depth: Wasser-Abstand zur Kueste (1..8, BFS) fuer den Tiefenverlauf
   // - noise: Hell-Dunkel-Rauschen je Zelle (grobe Flecken + feines Korn)
+  // - sparkles: wenige Wasserzellen fuer den animierten Wellen-Schimmer
   computeTerrainDetail() {
     const { w, h, terrain } = this.game.map;
     const n = w * h;
@@ -135,7 +149,7 @@ export class Renderer {
     for (let qi = 0; qi < queue.length; qi++) {
       const c = queue[qi];
       const d = depth[c];
-      if (d >= 6) continue;
+      if (d >= 8) continue;
       const x = c % w, y = (c / w) | 0;
       if (x > 0 && terrain[c - 1] === 0 && depth[c - 1] === 0) { depth[c - 1] = d + 1; queue.push(c - 1); }
       if (x < w - 1 && terrain[c + 1] === 0 && depth[c + 1] === 0) { depth[c + 1] = d + 1; queue.push(c + 1); }
@@ -146,26 +160,37 @@ export class Renderer {
 
     const noise = new Float32Array(n);
     const seed = this.game.seed | 0;
+    const sparkles = [];
     for (let c = 0; c < n; c++) {
       const x = c % w, y = (c / w) | 0;
       const patch = hash2(x >> 2, y >> 2, seed);       // 4x4-Flecken (Gelaende-Toene)
       const grain = hash2(x, y, seed ^ 0x9e37);        // feines Korn
       noise[c] = (patch - 0.5) * 0.65 + (grain - 0.5) * 0.35; // -0.5 .. 0.5
+      // Schimmer-Zellen: ~1.4 % der Wasserzellen, Phase aus dem Hash ableiten
+      if (terrain[c] === 0) {
+        const g2 = hash2(x, y, seed ^ 0x5f2b);
+        if (g2 > 0.986) sparkles.push({ x, y, phase: g2 * 40 });
+      }
     }
     this.noise = noise;
+    this.sparkles = sparkles;
   }
 
   // Eine Zelle in die Rohpixel (this.img) schreiben (4 Bytes: R,G,B,A).
-  // Wasser: Tiefenverlauf (Kueste hell -> See dunkel) + leichtes Rauschen.
+  // Wasser: Tiefenverlauf (Kueste hell -> See dunkel) + leichtes Rauschen,
+  // direkt am Land ein heller "Lagunen"-Saum.
   // Neutrales Land: deutlich strukturiert, Kuestenzellen als sandiger Strand.
-  // Reiche: Spielerfarbe mit dezentem Rauschen; Grenzkanten bleiben dunkler.
+  // Reiche: Spielerfarbe, innen dezent aufgehellt; Grenzen zweistufig
+  // (dunkle Kante + dunklerer Saum dahinter); am Wasser ein Kuestenschatten.
   paintCell(c) {
     const g = this.game;
     const w = g.map.w, h = g.map.h;
     let r, gr, b;
     if (g.map.terrain[c] === 0) {
-      const t = Math.min(1, (this.depth[c] - 1) / 5);  // 0 = Kueste, 1 = offene See
-      const f = 1 + this.noise[c] * 0.08;
+      const t = Math.min(1, (this.depth[c] - 1) / 7);  // 0 = Kueste, 1 = offene See
+      // Lagunen-Effekt: die ersten beiden Wasser-Ringe um Land aufhellen
+      const boost = this.depth[c] === 1 ? 1.16 : this.depth[c] === 2 ? 1.06 : 1;
+      const f = (1 + this.noise[c] * 0.08) * boost;
       r = (WATER_SHALLOW[0] + (WATER_DEEP[0] - WATER_SHALLOW[0]) * t) * f;
       gr = (WATER_SHALLOW[1] + (WATER_DEEP[1] - WATER_SHALLOW[1]) * t) * f;
       b = (WATER_SHALLOW[2] + (WATER_DEEP[2] - WATER_SHALLOW[2]) * t) * f;
@@ -179,16 +204,36 @@ export class Renderer {
       if (x < w - 1) { if (g.map.terrain[c + 1] === 0) coast = true; else if (g.owner[c + 1] !== o) edge = true; }
       if (y > 0) { if (g.map.terrain[c - w] === 0) coast = true; else if (g.owner[c - w] !== o) edge = true; }
       if (y < h - 1) { if (g.map.terrain[c + w] === 0) coast = true; else if (g.owner[c + w] !== o) edge = true; }
+      // "Saum": keine Randzelle, aber direkt hinter einer Randzelle – wird
+      // halbdunkel gezeichnet, dadurch wirken Grenzen weicher (2 Zonen).
+      // Prueft, ob ein gleichfarbiger Nachbar selbst eine Randzelle ist.
+      let seam = false;
+      if (o >= 0 && !edge) {
+        const isBorder = nb => {
+          if (g.map.terrain[nb] !== 1 || g.owner[nb] !== o) return false;
+          const nx = nb % w, ny = (nb / w) | 0;
+          return (nx > 0 && g.map.terrain[nb - 1] === 1 && g.owner[nb - 1] !== o) ||
+                 (nx < w - 1 && g.map.terrain[nb + 1] === 1 && g.owner[nb + 1] !== o) ||
+                 (ny > 0 && g.map.terrain[nb - w] === 1 && g.owner[nb - w] !== o) ||
+                 (ny < h - 1 && g.map.terrain[nb + w] === 1 && g.owner[nb + w] !== o);
+        };
+        if (x > 0) seam = isBorder(c - 1);
+        if (!seam && x < w - 1) seam = isBorder(c + 1);
+        if (!seam && y > 0) seam = isBorder(c - w);
+        if (!seam && y < h - 1) seam = isBorder(c + w);
+      }
       let base;
       let amp; // Staerke des Rauschens
       if (o < 0) {
         base = coast && !edge ? SAND : edge ? NEUTRAL_EDGE : NEUTRAL;
         amp = 0.16;
       } else {
-        base = edge ? this.colorsEdge[o] : this.colors[o];
+        base = edge ? this.colorsEdge[o] : seam ? this.colorsSeam[o] : this.colorsLight[o];
         amp = 0.09;
       }
-      const f = 1 + this.noise[c] * amp;
+      // Kuestenschatten auf Spieler-Land (Plastizitaet der Inseln)
+      const shore = o >= 0 && coast && !edge ? 0.88 : 1;
+      const f = (1 + this.noise[c] * amp) * shore;
       r = base[0] * f;
       gr = base[1] * f;
       b = base[2] * f;
@@ -208,18 +253,20 @@ export class Renderer {
     this.imgDirty = true;
   }
 
-  // Geänderte Zellen + Nachbarn neu einfärben (wegen Grenz-Schattierung).
-  // Nachbarn muessen mit, weil sich deren "Rand"-Status mitaendern kann.
+  // Geänderte Zellen + Umkreis neu einfärben (wegen Grenz-Schattierung).
+  // Es muss der 2er-Ring (5x5-Block) mit, weil sich durch die Saum-Logik
+  // (paintCell) auch Zellen zwei Schritte neben einer Grenzaenderung
+  // umfaerben koennen.
   markDirty(cells) {
     if (!cells.length) return;
     const w = this.game.map.w, h = this.game.map.h;
     for (const c of cells) {
-      this.paintCell(c);
       const x = c % w, y = (c / w) | 0;
-      if (x > 0) this.paintCell(c - 1);
-      if (x < w - 1) this.paintCell(c + 1);
-      if (y > 0) this.paintCell(c - w);
-      if (y < h - 1) this.paintCell(c + w);
+      const x0 = Math.max(0, x - 2), x1 = Math.min(w - 1, x + 2);
+      const y0 = Math.max(0, y - 2), y1 = Math.min(h - 1, y + 2);
+      for (let yy = y0; yy <= y1; yy++)
+        for (let xx = x0; xx <= x1; xx++)
+          this.paintCell(yy * w + xx);
     }
     this.imgDirty = true;
   }
@@ -317,13 +364,14 @@ export class Renderer {
 
   // Spielernamen zentriert auf der groessten Flaeche zeichnen (Bildschirm-
   // koordinaten, analog zu drawBadges — daher nach dem Zuruecksetzen der
-  // Transform aufrufen).
+  // Transform aufrufen). Cinzel-Schrift wie im Menü, weiss mit dunklem
+  // Outline, darunter ein kurzer Balken in Spielerfarbe.
   drawLabels(ctx) {
     const g = this.game;
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#000';
+    ctx.lineJoin = 'round';
 
     for (const [idx, info] of this.labelCache) {
       const p = g.players[idx];
@@ -338,8 +386,17 @@ export class Renderer {
       const fontSize = Math.max(9, Math.min(22, areaScale * 0.28));
       if (fontSize < 9.5) continue; // zu winzig -> weglassen statt Buchstabensalat
 
-      ctx.font = `700 ${fontSize}px 'Segoe UI', sans-serif`;
+      ctx.font = `700 ${fontSize}px 'Cinzel', serif`;
+      // Outline fuer Lesbarkeit auf jeder Territoriumsfarbe
+      ctx.lineWidth = Math.max(2, fontSize * 0.22);
+      ctx.strokeStyle = 'rgba(8, 14, 24, 0.9)';
+      ctx.strokeText(p.name, px, py);
+      ctx.fillStyle = '#f4efe2';
       ctx.fillText(p.name, px, py);
+      // Kurzer Balken in Spielerfarbe unter dem Namen
+      const tw = ctx.measureText(p.name).width;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(px - tw * 0.3, py + fontSize * 0.62, tw * 0.6, Math.max(1.5, fontSize * 0.11));
     }
     ctx.restore();
   }
@@ -353,14 +410,19 @@ export class Renderer {
       this.imgDirty = false;
     }
     const ctx = this.ctx;
-    ctx.fillStyle = '#16283c';
+    ctx.fillStyle = '#0e2136';           // an den tiefen Wasserton angelehnt
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.imageSmoothingEnabled = false;   // harte Pixel statt Weichzeichnen
     // Transform = Zoom + Pan: ab hier wird in Kartenkoordinaten gezeichnet.
     ctx.setTransform(this.scale, 0, 0, this.scale, this.ox, this.oy);
     ctx.drawImage(this.off, 0, 0);       // die ganze Karte in einem Rutsch
+    this.drawShimmer(ctx, now);          // pulsierende Lichtpunkte auf dem Wasser
     this.drawOverlays(ctx);              // Gebaeude/Schiffe/Zuege darueber
     ctx.setTransform(1, 0, 0, 1, 0, 0);  // zurueck zu Bildschirmkoordinaten
+    // Vignette: dezente Abdunklung der Bildschirmraender ueber der Karte,
+    // aber unter Badges/Labels.
+    ctx.fillStyle = this.vignette;
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawBadges(ctx);
 
     this.updateLabels(now);              // Flaechen-Schwerpunkte periodisch neu berechnen
@@ -381,28 +443,60 @@ export class Renderer {
     this.drawMinimap();
   }
 
+  // Wellen-Schimmer: wenige vorberechnete Wasserzellen (this.sparkles) als
+  // pulsierende Lichtpunkte. Nur der sichtbare Ausschnitt wird gezeichnet;
+  // die Pixelkarte selbst bleibt statisch (kein teures Repaint).
+  // Bei ausgeschalteten Animationen: statischer, schwacher Schimmer.
+  drawShimmer(ctx, now) {
+    if (!this.sparkles.length) return;
+    const vx0 = -this.ox / this.scale - 1, vy0 = -this.oy / this.scale - 1;
+    const vx1 = vx0 + this.canvas.width / this.scale + 2;
+    const vy1 = vy0 + this.canvas.height / this.scale + 2;
+    ctx.fillStyle = '#dff3ff';
+    for (const sp of this.sparkles) {
+      if (sp.x < vx0 || sp.x > vx1 || sp.y < vy0 || sp.y > vy1) continue;
+      ctx.globalAlpha = this.animations
+        ? 0.08 + 0.3 * (0.5 + 0.5 * Math.sin(now / 750 + sp.phase))
+        : 0.14;
+      ctx.fillRect(sp.x, sp.y, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // Truppen-Badges für laufende Angriffe und Boote (in Bildschirmkoordinaten)
   drawBadges(ctx) {
     const g = this.game;
     const w = g.map.w;
-    // Hilfsfunktion: eine kleine beschriftete Sprechblase an Kartenposition
+    // Hilfsfunktion: eine kleine beschriftete Pille an Kartenposition
     // (mapX, mapY) zeichnen. Ausserhalb des Sichtfensters wird uebersprungen.
     const badge = (mapX, mapY, label, color) => {
       const px = mapX * this.scale + this.ox;
       const py = mapY * this.scale + this.oy;
       if (px < -60 || py < -30 || px > this.canvas.width + 60 || py > this.canvas.height + 30) return;
       ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       const tw = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(10, 20, 32, 0.75)';
+      const bw = tw + 14, bh = 19;
+      // Pille mit weichem Schatten, danach Rand in Spielerfarbe
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 5;
+      ctx.shadowOffsetY = 1;
+      ctx.fillStyle = 'rgba(10, 20, 32, 0.85)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(px - bw / 2, py - bh / 2, bw, bh, bh / 2);
+      else ctx.rect(px - bw / 2, py - bh / 2, bw, bh);
+      ctx.fill();
+      ctx.restore();
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(px - tw / 2 - 6, py - 9, tw + 12, 18, 9);
-      else ctx.rect(px - tw / 2 - 6, py - 9, tw + 12, 18);
-      ctx.fill();
+      if (ctx.roundRect) ctx.roundRect(px - bw / 2, py - bh / 2, bw, bh, bh / 2);
+      else ctx.rect(px - bw / 2, py - bh / 2, bw, bh);
       ctx.stroke();
       ctx.fillStyle = '#fff';
-      ctx.fillText(label, px - tw / 2, py + 4);
+      ctx.fillText(label, px, py + 0.5);
     };
     // Pro Angriff eine Badge am Schwerpunkt der Front (⚔ + Truppenzahl)
     for (const atk of g.attacks) {
@@ -428,7 +522,7 @@ export class Renderer {
     if (!this.miniCtx) return;
     const m = this.mini, mctx = this.miniCtx;
     mctx.imageSmoothingEnabled = false;
-    mctx.fillStyle = '#16283c';
+    mctx.fillStyle = '#0e2136';
     mctx.fillRect(0, 0, m.width, m.height);
     mctx.drawImage(this.off, 0, 0, m.width, m.height);
     // Sichtfenster-Rechteck: aktueller Ausschnitt in Minimap-Koordinaten
@@ -453,8 +547,8 @@ export class Renderer {
     // Fabrik–Station UND Stadt–Stadt (siehe buildRailNetwork). Alles in einem
     // Pfad, das ist deutlich schneller als ein Pfad je Kante.
     if (g.rails && g.rails.edges.length) {
-      ctx.strokeStyle = 'rgba(40, 32, 24, 0.6)';
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = 'rgba(46, 36, 26, 0.8)';
+      ctx.lineWidth = 0.55;
       ctx.beginPath();
       for (const [a, b] of g.rails.edges) {
         ctx.moveTo(cx(a), cy(a));
@@ -621,22 +715,38 @@ export class Renderer {
       ctx.restore();
     }
 
-    // Handelsschiffe (kleine Kreise)
+    // Handelsschiffe (kleines Segel ueber Rumpf in Spielerfarbe)
     for (const s of g.tradeShips) {
       const c = g.tradeShipCell(s);
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(cx(c), cy(c), 1.4, 0, Math.PI * 2); ctx.fill();
+      const x = cx(c), y = cy(c);
       ctx.fillStyle = g.players[s.owner].color;
-      ctx.beginPath(); ctx.arc(cx(c), cy(c), 0.85, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - 1.3, y + 0.3, 2.6, 1, 0.5);
+      else ctx.rect(x - 1.3, y + 0.3, 2.6, 1);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(x, y - 1.7);
+      ctx.lineTo(x + 1.2, y + 0.4);
+      ctx.lineTo(x - 1.2, y + 0.4);
+      ctx.closePath();
+      ctx.fill();
     }
 
-    // Transportboote (Invasion)
+    // Transportboote (Invasion) – Rumpf mit rundem Bug/Heck
     for (const boat of g.boats) {
       const c = boat.path[Math.min(boat.path.length - 1, boat.pos | 0)];
+      const x = cx(c), y = cy(c);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(cx(c) - 1.8, cy(c) - 1.2, 3.6, 2.4);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - 1.8, y - 1.2, 3.6, 2.4, 1.2);
+      else ctx.rect(x - 1.8, y - 1.2, 3.6, 2.4);
+      ctx.fill();
       ctx.fillStyle = g.players[boat.owner].color;
-      ctx.fillRect(cx(c) - 1.1, cy(c) - 0.6, 2.2, 1.2);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - 1.1, y - 0.6, 2.2, 1.2, 0.6);
+      else ctx.rect(x - 1.1, y - 0.6, 2.2, 1.2);
+      ctx.fill();
     }
 
     // Kriegsschiffe (größer, mit Lebensbalken)
@@ -660,9 +770,15 @@ export class Renderer {
         ctx.stroke();
       }
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x - 2.4, y - 1.3, 4.8, 2.6);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - 2.4, y - 1.3, 4.8, 2.6, 1.3);
+      else ctx.rect(x - 2.4, y - 1.3, 4.8, 2.6);
+      ctx.fill();
       ctx.fillStyle = g.players[ws.owner].color;
-      ctx.fillRect(x - 1.7, y - 0.7, 3.4, 1.4);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - 1.7, y - 0.7, 3.4, 1.4, 0.7);
+      else ctx.rect(x - 1.7, y - 0.7, 3.4, 1.4);
+      ctx.fill();
       // Lebensbalken darueber: gruen > 50% HP, sonst rot
       const maxHp = g.warshipMaxHp(ws);
       const frac = Math.max(0, (maxHp - ws.dmg) / maxHp);
