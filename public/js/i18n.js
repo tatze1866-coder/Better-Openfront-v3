@@ -32,6 +32,9 @@ const dict = {
   profileNameHint: { de: 'Gilt für Einzel- und Mehrspieler – dasselbe Feld wie im Menü.', en: 'Used for single- and multiplayer – same field as in the menu.' },
   profileStatsSoon: { de: 'Statistiken werden noch gesammelt – hier gibt\'s bald Siege, Niederlagen und mehr.', en: 'Stats are still being collected – wins, losses and more coming soon.' },
   profileHistorySoon: { de: 'Noch keine gespeicherten Spiele – der Spielverlauf kommt in einem späteren Update.', en: 'No saved games yet – match history is coming in a later update.' },
+  iconPickerBtnTitle: { de: 'Icon ändern', en: 'Change icon' },
+  iconPickerTitle: { de: 'Icon wählen', en: 'Choose icon' },
+  iconPickerHint: { de: 'Wähle dein Wappen – gilt überall, wo dein Name angezeigt wird.', en: 'Pick your emblem – used everywhere your name is shown.' },
 
   // ---------- Hauptmenü ----------
   soloHeading: { de: 'Einzelspieler', en: 'Singleplayer' },

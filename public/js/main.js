@@ -101,7 +101,9 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('settingsOverlay').classList.contains('hidden')) {
     closeSettings();
   }
-  if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
+  if (e.key === 'Escape' && !$('iconPickerOverlay').classList.contains('hidden')) {
+    closeIconPicker();
+  } else if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
     closeProfile();
   }
 });
@@ -263,6 +265,69 @@ $('profileBtn').addEventListener('click', openProfile);
 $('btnProfileClose').addEventListener('click', closeProfile);
 $('profileOverlay').addEventListener('click', e => {
   if (e.target === $('profileOverlay')) closeProfile();
+});
+
+// ---------- Profil-Icon (Wappen) ----------
+// 20 auswählbare Wappen-Icons; Auswahl wird in localStorage gemerkt.
+const PROFILE_ICONS = [
+  'crown', 'helmet', 'sword-shield', 'compass', 'ship',
+  'mountain', 'tower', 'lion', 'book', 'crossed-swords',
+  'deer', 'tree', 'wolf', 'raven', 'dragon',
+  'torch', 'hourglass', 'potion', 'moon', 'banner',
+];
+const DEFAULT_AVATAR_SVG = `<svg viewBox="0 0 40 46" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M20 2 L37 8 V21 C37 32 30 40 20 44 C10 40 3 32 3 21 V8 Z" fill="#0f1c2b" stroke="#d4af6a" stroke-width="2"/>
+  <path d="M20 10 C15 10 12 13 12 17 C12 22 16 25 16 28 L24 28 C24 25 28 22 28 17 C28 13 25 10 20 10 Z" fill="#3b5b8c"/>
+  <circle cx="20" cy="9" r="3.4" fill="#d4af6a"/>
+</svg>`;
+let profileIcon = localStorage.getItem('ofProfileIcon');
+if (profileIcon && !PROFILE_ICONS.includes(profileIcon)) profileIcon = null;
+
+// Alle drei Stellen (Menü-Button, Profil-Avatar, Sidebar-Tab) synchron halten.
+function applyProfileIcon() {
+  const html = profileIcon
+    ? `<img src="images/emblems/${profileIcon}.png" alt="">`
+    : DEFAULT_AVATAR_SVG;
+  $('profileEmblem').innerHTML = html;
+  $('profileAvatarGraphic').innerHTML = html;
+  $('profileNavEmblem').innerHTML = html;
+}
+applyProfileIcon();
+
+// Auswahl-Raster im Icon-Dialog einmalig aufbauen
+const iconPickerGrid = $('iconPickerGrid');
+PROFILE_ICONS.forEach(key => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'icon-picker-item';
+  btn.dataset.icon = key;
+  btn.innerHTML = `<img src="images/emblems/${key}.png" alt="${key}">`;
+  btn.addEventListener('click', () => {
+    profileIcon = key;
+    localStorage.setItem('ofProfileIcon', key);
+    applyProfileIcon();
+    updateIconPickerSelection();
+    closeIconPicker();
+  });
+  iconPickerGrid.appendChild(btn);
+});
+function updateIconPickerSelection() {
+  iconPickerGrid.querySelectorAll('.icon-picker-item').forEach(el => {
+    el.classList.toggle('sel', el.dataset.icon === profileIcon);
+  });
+}
+
+function openIconPicker() {
+  updateIconPickerSelection();
+  $('iconPickerOverlay').classList.remove('hidden');
+}
+function closeIconPicker() {
+  $('iconPickerOverlay').classList.add('hidden');
+}
+$('profileAvatarBig').addEventListener('click', openIconPicker);
+$('btnIconPickerClose').addEventListener('click', closeIconPicker);
+$('iconPickerOverlay').addEventListener('click', e => {
+  if (e.target === $('iconPickerOverlay')) closeIconPicker();
 });
 
 // Tabs im Profil-Dialog (Player / Skins / Statistiken / Spielverlauf)
