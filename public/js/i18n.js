@@ -20,6 +20,7 @@ const dict = {
   fpsOn: { de: 'An', en: 'On' },
   fpsOff: { de: 'Aus', en: 'Off' },
   buildingStyleLabel: { de: 'Gebäude-Grafik', en: 'Building graphics' },
+  buildingStyleOrig: { de: 'Standard (Emoji)', en: 'Standard (emoji)' },
   buildingStyleOld: { de: 'Alt (Wappen)', en: 'Old (badges)' },
   buildingStyleNew: { de: 'Neu (Inseln)', en: 'New (islands)' },
 
