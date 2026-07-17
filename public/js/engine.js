@@ -178,6 +178,7 @@ export class Game {
     this.boats = [];               // Truppen-Transportboote unterwegs
     this.tradeShips = [];          // Handelsschiffe zwischen Häfen
     this.warships = [];            // Kriegsschiffe
+    this.warshipSeq = 0;           // laufende ID für Kriegsschiffe (für Befehle)
     this.trains = [];              // Züge auf Schienennetzen
     // Schienennetz-Graph, jede Runde neu berechnet (siehe buildRailNetwork):
     // adj = Zelle -> Nachbarknoten, edges = Kantenliste fürs Zeichnen
@@ -480,7 +481,25 @@ export class Game {
         for (let i = 0; i < k; i++) if (this.map.terrain[nb[i]] === 0) { spawn = nb[i]; break; }
         if (spawn < 0) return;
         p.money -= WARSHIP_COST;
-        this.warships.push({ owner: p.idx, home: c, cell: spawn, path: [], pi: 0, dmg: 0, born: this.turnNo, cd: WARSHIP_SHOT_CD });
+        this.warships.push({ id: this.warshipSeq++, owner: p.idx, home: c, cell: spawn, path: [], pi: 0, dmg: 0, born: this.turnNo, cd: WARSHIP_SHOT_CD, order: -1 });
+        break;
+      }
+      // Einem eigenen Kriegsschiff einen Wegpunkt (Wasserzelle) zuweisen.
+      // Der Wegpunkt hat Vorrang vor Jagd/Patrouille (nicht vor Notreparatur)
+      // und gilt, bis das Schiff ihn erreicht hat.
+      case 'warship_move': {
+        if (this.phase !== 'play') return;
+        const w = this.warships.find(x => x.id === (it.id | 0));
+        if (!w || w.owner !== p.idx) return;
+        const c = it.cell | 0;
+        if (c < 0 || c >= this.map.terrain.length || this.map.terrain[c] !== 0) return;
+        // Nur annehmen, wenn das Ziel überhaupt erreichbar ist (Terrain ist
+        // statisch, die Prüfung bleibt also dauerhaft gültig)
+        const path = this.bfsWater([w.cell], q => q === c);
+        if (!path) return;
+        w.order = c;
+        w.home = c; // neues Patrouillenzentrum: nach Ankunft bleibt das Schiff dort
+        w.path = path; w.pi = 0;
         break;
       }
       // Allianz anfragen bzw. eine offene Gegenanfrage annehmen
@@ -813,8 +832,8 @@ export class Game {
   }
 
   // Neues Ziel/Route fuer ein Kriegsschiff festlegen. Prioritaet: schwer
-  // beschaedigt -> Reparaturhafen; sonst nahes feindliches Handelsschiff jagen;
-  // sonst um den Heimathafen patrouillieren.
+  // beschaedigt -> Reparaturhafen; sonst Spieler-Wegpunkt (order); sonst nahes
+  // feindliches Handelsschiff jagen; sonst um den Heimathafen patrouillieren.
   retargetWarship(w, maxHp) {
     let goal = null; // Zielzelle (Wasser) oder Prädikat
     if (w.dmg >= maxHp - 1) {
@@ -829,6 +848,15 @@ export class Game {
       if (best >= 0) {
         const targets = new Set(this.waterAdjacent(best));
         if (targets.size) goal = c => targets.has(c);
+      }
+    }
+    if (!goal && w.order >= 0) {
+      // Spieler-Wegpunkt: dorthin fahren; angekommen -> Befehl erledigt
+      if (this.dist2(w.cell, w.order) <= 2) {
+        w.order = -1;
+      } else {
+        const target = w.order;
+        goal = c => c === target;
       }
     }
     if (!goal) {

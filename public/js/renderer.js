@@ -70,6 +70,7 @@ export class Renderer {
     this.factoryHint = false;
     this.buildingStyle = 'orig'; // 'orig' = Emoji/Formen, 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
+    this.selectedWarshipId = -1; // per Klick ausgewaehltes eigenes Kriegsschiff
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -628,6 +629,23 @@ export class Renderer {
     // Kriegsschiffe (größer, mit Lebensbalken)
     for (const ws of g.warships) {
       const x = cx(ws.cell), y = cy(ws.cell);
+      // Ausgewaehltes eigenes Schiff: goldener Ring + Linie/Marke zum Wegpunkt
+      if (ws.id === this.selectedWarshipId && ws.owner === this.myIdx) {
+        if (ws.order >= 0) {
+          const ox = cx(ws.order), oy = cy(ws.order);
+          ctx.strokeStyle = 'rgba(244,162,97,0.7)';
+          ctx.lineWidth = 0.5;
+          ctx.setLineDash([1.5, 1.5]);
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ox, oy); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(ox, oy, 1.6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = '#f4a261';
+        ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(x - 2.4, y - 1.3, 4.8, 2.6);
       ctx.fillStyle = g.players[ws.owner].color;

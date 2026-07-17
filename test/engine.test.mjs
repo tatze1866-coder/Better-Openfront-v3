@@ -906,6 +906,46 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     `Bonus bei zwei überlappenden Festungen: ${gc.fortBonus(f1 + 5, 0)}x`);
 }
 
+// ---- Spiel 14: Kriegsschiff-Wegpunkte (warship_move) ----
+{
+  const gw = newGame(91);
+  while (gw.phase === 'spawn') gw.turn([]);
+
+  // Kriegsschiff direkt aufs Wasser setzen (wie nach dem Stapellauf)
+  const water = [];
+  for (let c = 0; c < gw.map.terrain.length; c++) if (gw.map.terrain[c] === 0) water.push(c);
+  const start = water[0];
+  gw.warships.push({ id: gw.warshipSeq++, owner: 0, home: start, cell: start, path: [], pi: 0, dmg: 0, born: gw.turnNo, cd: 12, order: -1 });
+  const ws = gw.warships[0];
+
+  // Erreichbares, entferntes Wasserziel suchen
+  let target = -1;
+  for (const c of water) {
+    if (gw.dist2(c, start) >= 400 && gw.bfsWater([start], q => q === c)) { target = c; break; }
+  }
+  ok('Wasser-Wegpunkt gefunden', target >= 0);
+
+  // Fremder Spieler darf das Schiff nicht steuern
+  gw.applyIntent({ p: 1, type: 'warship_move', id: ws.id, cell: target });
+  ok('Fremdes Kriegsschiff nicht steuerbar', ws.order === -1);
+
+  // Landziel wird ignoriert
+  gw.applyIntent({ p: 0, type: 'warship_move', id: ws.id, cell: gw.landCells[0] });
+  ok('Landziel wird ignoriert', ws.order === -1);
+
+  // Gültiger Befehl: Wegpunkt gesetzt, Schiff fährt hin, Befehl erlischt
+  gw.applyIntent({ p: 0, type: 'warship_move', id: ws.id, cell: target });
+  ok('Wegpunkt gesetzt', ws.order === target && ws.path.length > 0);
+  let arrived = false;
+  for (let i = 0; i < 600 && !arrived; i++) {
+    gw.turn([]);
+    arrived = gw.dist2(ws.cell, target) <= 2;
+  }
+  ok('Kriegsschiff erreicht den Wegpunkt', arrived, `Distanz² am Ende: ${gw.dist2(ws.cell, target)}`);
+  for (let i = 0; i < 30; i++) gw.turn([]);
+  ok('Befehl nach Ankunft erledigt (zurück zur Patrouille)', ws.order === -1);
+}
+
 console.log(results.join('\n'));
 const fails = results.filter(r => r.startsWith('FAIL')).length;
 console.log(`\n${results.length - fails}/${results.length} Tests bestanden`);

@@ -3,6 +3,21 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.16.0] – 2026-07-17
+
+### Hinzugefügt
+- **Kriegsschiffe steuerbar**: Eigenes Kriegsschiff anklicken (goldener
+  Ring), dann ein Ziel auf dem Wasser anklicken – das Schiff nimmt den
+  kürzesten Seeweg dorthin und patrouilliert danach dort weiter. Der
+  Wegpunkt hat Vorrang vor der Handelsschiff-Jagd; nur ein schwer
+  beschädigtes Schiff fährt weiterhin zuerst zur Reparatur. Esc oder ein
+  Klick an Land hebt die Auswahl auf.
+- **Profil & Erfolge** (von Tatze): Profil-Button oben rechts im Menü mit
+  Spielername, 20 wählbaren Wappen und einem Erfolge-System – 26 Kategorien
+  mit je 4 Stufen (Siege, Gebäude, Allianzen, erobertes Land, ausgelöschte
+  Nationen u.v.m.), Fortschritt wird lokal gespeichert, neue Stufen
+  erscheinen als Toast und im Siegesbildschirm.
+
 ## [0.15.0] – 2026-07-17
 
 ### Hinzugefügt

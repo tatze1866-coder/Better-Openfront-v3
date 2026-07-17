@@ -106,6 +106,8 @@ document.addEventListener('keydown', e => {
     closeIconPicker();
   } else if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
     closeProfile();
+  } else if (e.key === 'Escape' && selectedWarship >= 0) {
+    setSelectedWarship(-1); // Kriegsschiff-Auswahl aufheben
   }
 });
 
@@ -757,6 +759,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   $('leaderboard').innerHTML = '';
   $('lbTip').classList.add('hidden');
   $('eventFeed').innerHTML = ''; // Feed gehört zum alten Spiel
+  setSelectedWarship(-1);        // Kriegsschiff-Auswahl gehört auch dazu
   $('attackList').classList.add('hidden');
   // Allianz-Anfrage-Karten gehören auch zum alten Spiel -> entfernen
   for (const card of allyReqCards.values()) card.remove();
@@ -1457,6 +1460,29 @@ canvas.addEventListener('pointerleave', () => {
   if (game) updateLbTip();
 });
 
+// ---------- Kriegsschiff-Auswahl ----------
+// Klick auf ein eigenes Kriegsschiff wählt es aus, der nächste Klick aufs
+// Wasser schickt es dorthin (warship_move-Intent). Klick woanders hebt die
+// Auswahl wieder auf.
+let selectedWarship = -1;
+
+function setSelectedWarship(id) {
+  selectedWarship = id;
+  if (renderer) renderer.selectedWarshipId = id;
+}
+
+// Eigenes Kriegsschiff nahe der Klickzelle (großzügiger Fangradius)
+function ownWarshipAt(cell) {
+  if (cell < 0) return null;
+  let best = null, bestD = Infinity;
+  for (const w of game.warships) {
+    if (w.owner !== myIdx) continue;
+    const d = game.dist2(w.cell, cell);
+    if (d <= 9 && d < bestD) { bestD = d; best = w; }
+  }
+  return best;
+}
+
 // Besitze ich Zellen auf dieser Insel? (entscheidet Landangriff vs. Boot)
 function ownCellOnIsland(islandId) {
   for (let c = 0; c < game.owner.length; c++) {
@@ -1472,6 +1498,26 @@ canvas.addEventListener('pointerup', e => {
   pointerDown = false;
   if (panned || !game || !renderer) return;
   const cell = renderer.screenToCell(e.clientX, e.clientY);
+
+  // Kriegsschiff-Steuerung: eigenes Schiff anklicken, dann Ziel aufs Wasser
+  if (game.phase === 'play' && !buildMode) {
+    const ws = ownWarshipAt(cell);
+    if (ws) {
+      setSelectedWarship(ws.id === selectedWarship ? -1 : ws.id);
+      if (selectedWarship >= 0) showToast('Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴');
+      return;
+    }
+    if (selectedWarship >= 0) {
+      if (cell >= 0 && game.map.terrain[cell] === 0) {
+        sendIntent({ type: 'warship_move', id: selectedWarship, cell });
+        showToast('Kriegsschiff nimmt Kurs! ⛴');
+        setSelectedWarship(-1);
+        return;
+      }
+      setSelectedWarship(-1); // Klick an Land: Auswahl aufheben, normal weiter
+    }
+  }
+
   if (cell < 0 || game.map.terrain[cell] !== 1) return;
 
   if (game.phase === 'spawn') {
