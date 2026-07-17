@@ -37,6 +37,10 @@ applyAnimations();
 // abschneiden.
 const SOUNDS = {
   boatIncoming: 'audio/boat-incoming.wav',
+  warshipLost: 'audio/warship-destroyed.wav',
+  attacked: 'audio/attacked.wav',
+  win: 'audio/win.wav',
+  lose: 'audio/lose.wav',
 };
 function playSound(name) {
   if (settings.volume <= 0) return;
@@ -860,11 +864,14 @@ function checkGameEnd() {
     if (iWon && game.winners.length > 1) {
       const partners = game.winners.filter(i => i !== myIdx).map(i => game.players[i].name).join(', ');
       title = 'Team-Sieg! 🏆🤝'; text = `Gemeinsam gewonnen mit: ${partners}`;
+      playSound('win');
     } else if (iWon) {
       title = 'Sieg! 🏆'; text = 'Du beherrschst die Karte!';
+      playSound('win');
     } else {
       title = 'Spiel vorbei';
       text = game.winners.length > 1 ? `Das Bündnis ${names} hat gewonnen.` : `${names} hat gewonnen.`;
+      playSound('lose');
     }
     // Online: gemeinsam zurück in die Lobby (oder ganz raus ins Menü). Solo: nur Menü.
     showOverlay(title, text, online ? ['btnBackToLobby', 'btnBackToMenu'] : ['btnBackToMenu'],
@@ -874,6 +881,7 @@ function checkGameEnd() {
     // Eigener Tod, während das Spiel weiterläuft: Wahl zwischen Zuschauen und
     // (Online) in der Lobby auf das Spielende warten. Nur einmal zeigen.
     deadShown = true;
+    playSound('lose');
     showOverlay('Eliminiert 💀', 'Dein Reich wurde erobert.',
       online ? ['btnSpectate', 'btnWaitLobby'] : ['btnSpectate', 'btnBackToMenu']);
   }
@@ -1126,9 +1134,13 @@ function showFeedEvents() {
         : `💀 ${nm(e.p)} wurde ausgelöscht`, e.by === myIdx ? false : true);
     } else if (e.t === 'atk' && e.p === myIdx) {
       pushFeed(`⚔ ${nm(e.by)} greift dich an!`, true);
+      playSound('attacked');
     } else if (e.t === 'boat' && e.p === myIdx) {
       pushFeed(`🚤 ${nm(e.by)} schickt ein Boot in deine Richtung!`, true);
       playSound('boatIncoming');
+    } else if (e.t === 'warshipLost' && e.p === myIdx) {
+      pushFeed(`💥 ${nm(e.by)} hat dein Kriegsschiff versenkt!`, true);
+      playSound('warshipLost');
     } else if (e.t === 'ally' && e.a !== myIdx && e.b !== myIdx) {
       pushFeed(`🤝 ${nm(e.a)} und ${nm(e.b)} sind jetzt verbündet`, false);
     } else if (e.t === 'unally' && e.a !== myIdx) {

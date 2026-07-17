@@ -13,7 +13,7 @@ const dict = {
   guideIconTitle: { de: 'Anleitung (bald verfügbar)', en: 'Guide (coming soon)' },
   statsIconTitle: { de: 'Statistik (bald verfügbar)', en: 'Stats (coming soon)' },
   volumeLabel: { de: 'Lautstärke', en: 'Volume' },
-  volumeSoonNote: { de: 'Gilt bisher nur für den Warnton bei ankommenden Booten.', en: 'Currently only applies to the incoming-boat warning sound.' },
+  volumeSoonNote: { de: 'Gilt für Warntöne (Angriff, ankommendes Boot, verlorenes Kriegsschiff, Sieg/Niederlage).', en: 'Applies to warning sounds (attack, incoming boat, lost warship, win/lose).' },
   animationsLabel: { de: 'Animationen', en: 'Animations' },
   animOn: { de: 'An', en: 'On' },
   animOff: { de: 'Aus', en: 'Off' },
