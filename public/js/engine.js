@@ -145,11 +145,16 @@ export const PLAYER_COLORS = [
 // wählbar im Menü). Index 3 ist der Masse-Bot: absichtlich schlecht und passiv
 // – er expandiert langsam ins Neutrale, baut nichts, fährt keine Boote und
 // greift Spieler nur an, wenn er haushoch überlegen ist. Davon gibt es viele.
+//
+// "Schwer" hat zusaetzlich smart:true -> in botAct() nutzt das eine dichte-
+// basierte Zielauswahl (wer ist GUENSTIG zu erobern, nicht nur wer hat
+// weniger Truppen) und in botBuild() hoehere Gebaeude-Obergrenzen plus
+// gezielte Festungen an der eigenen Grenze statt auf gut Glueck irgendwo.
 export const BOT_LEVELS = [
-  { name: 'Leicht', icon: '🟢', interval: 26, minTroops: 150, ratioN: 0.45, ratioE: 0.5, threshold: 1.1, allyAccept: 0.75, city: false, fort: false, boatMin: 450 },
-  { name: 'Mittel', icon: '🟡', interval: 13, minTroops: 45, ratioN: 0.55, ratioE: 0.65, threshold: 0.75, allyAccept: 0.4, city: true, fort: false, boatMin: 170 },
-  { name: 'Schwer', icon: '🔴', interval: 5, minTroops: 25, ratioN: 0.6, ratioE: 0.72, threshold: 0.55, allyAccept: 0.15, city: true, fort: true, boatMin: 100 },
-  { name: 'Bot', icon: '🤖', interval: 60, minTroops: 300, ratioN: 0.35, ratioE: 0.35, threshold: 3.0, allyAccept: 0.95, city: false, fort: false, boatMin: 1e9 },
+  { name: 'Leicht', icon: '🟢', interval: 26, minTroops: 150, ratioN: 0.45, ratioE: 0.5,  threshold: 1.1,  allyAccept: 0.75, city: false, fort: false, boatMin: 450, maxPorts: 2, maxForts: 0, maxFactories: 0, maxWarships: 0, smart: false },
+  { name: 'Mittel', icon: '🟡', interval: 13, minTroops: 45,  ratioN: 0.55, ratioE: 0.65, threshold: 0.75, allyAccept: 0.4,  city: true,  fort: false, boatMin: 170, maxPorts: 3, maxForts: 1, maxFactories: 1, maxWarships: 1, smart: false },
+  { name: 'Schwer', icon: '🔴', interval: 4,  minTroops: 20,  ratioN: 0.75, ratioE: 0.8,  threshold: 0.5,  allyAccept: 0.08, city: true,  fort: true,  boatMin: 70,  maxPorts: 6, maxForts: 6, maxFactories: 4, maxWarships: 3, smart: true },
+  { name: 'Bot', icon: '🤖', interval: 60, minTroops: 300, ratioN: 0.35, ratioE: 0.35, threshold: 3.0, allyAccept: 0.95, city: false, fort: false, boatMin: 1e9, maxPorts: 2, maxForts: 0, maxFactories: 0, maxWarships: 0, smart: false },
 ];
 export const WEAK_BOT_LEVEL = 3;     // Index des Masse-Bot-Profils
 
@@ -1530,11 +1535,33 @@ export class Game {
     return -1;
   }
 
+  // Wie randomOwnCell, bevorzugt aber Grenzzellen (mindestens ein Nachbarfeld
+  // gehoert nicht dem Spieler) – wichtig fuer Festungen, die nur an der Front
+  // etwas bringen. Faellt auf eine normale eigene Zelle zurueck, falls in den
+  // Versuchen keine Grenze gefunden wird (z.B. Insel komplett im Landesinneren
+  // schon von Festungen belegt).
+  borderOwnCell(pIdx, tries) {
+    const nb = new Int32Array(4);
+    let fallback = -1;
+    for (let t = 0; t < tries; t++) {
+      const c = this.landCells[(this.rng() * this.landCells.length) | 0];
+      if (this.owner[c] !== pIdx) continue;
+      if (fallback < 0) fallback = c;
+      const k = this.neighbors4(c, nb);
+      for (let i = 0; i < k; i++) {
+        const m = nb[i];
+        if (this.map.terrain[m] === 1 && this.owner[m] !== pIdx) return c;
+      }
+    }
+    return fallback;
+  }
+
   // Bots geben ihr Geld für Gebäude und Schiffe aus
   botBuild(p, L) {
     if (!L.city || p.territory < 150) return;
-    // 1. Hafen an der Küste (Handel = Haupteinnahmequelle)
-    if (p.ports < 2 && p.money > this.buildCostOf(p.idx, 'port') + 100) {
+    // 1. Hafen an der Küste (Handel = Haupteinnahmequelle) – Obergrenze je
+    //    nach Schwierigkeit (Schwer baut deutlich mehr Häfen als Mittel).
+    if (p.ports < L.maxPorts && p.money > this.buildCostOf(p.idx, 'port') + 100) {
       for (let t = 0; t < 30; t++) {
         const c = this.randomOwnCell(p.idx, 5);
         if (c >= 0 && this.canBuildAt(p.idx, c, 'port') === null) {
@@ -1543,8 +1570,10 @@ export class Game {
         }
       }
     }
-    // 2. Stadt, wenn das Truppenlimit drückt
-    if (p.troops > this.maxTroopsOf(p) * 0.6 && p.money > this.buildCostOf(p.idx, 'city')) {
+    // 2. Stadt, wenn das Truppenlimit drückt (smarte Bots bauen frueher nach,
+    //    damit ihnen die Truppen fuer Angriffe nicht ausgehen).
+    const cityThreshold = L.smart ? 0.45 : 0.6;
+    if (p.troops > this.maxTroopsOf(p) * cityThreshold && p.money > this.buildCostOf(p.idx, 'city')) {
       const c = this.randomOwnCell(p.idx, 20);
       if (c >= 0 && this.canBuildAt(p.idx, c, 'city') === null) {
         this.applyIntent({ p: p.idx, type: 'build', kind: 'city', cell: c });
@@ -1552,7 +1581,7 @@ export class Game {
       }
     }
     // 3. Fabrik nahe eigener Stationen (Züge = Geld)
-    if (p.factories < 2 && (p.cities + p.ports) >= 2 && p.money > this.buildCostOf(p.idx, 'factory') + 100) {
+    if (p.factories < L.maxFactories && (p.cities + p.ports) >= 2 && p.money > this.buildCostOf(p.idx, 'factory') + 100) {
       const stations = this.buildings.filter(b => b.owner === p.idx && (b.kind === 'city' || b.kind === 'port'));
       for (let t = 0; t < 30 && stations.length; t++) {
         const c = this.randomOwnCell(p.idx, 5);
@@ -1564,17 +1593,19 @@ export class Game {
         }
       }
     }
-    // 4. Schwere Bots: Festungen und Kriegsschiffe
+    // 4. Festungen und Kriegsschiffe (nur Bots mit L.fort, i.d.R. Schwer).
     if (L.fort) {
-      if (p.forts < 3 && p.money > BUILD_COSTS.fort + 300) {
-        const c = this.randomOwnCell(p.idx, 20);
+      if (p.forts < L.maxForts && p.money > BUILD_COSTS.fort + 300) {
+        // Smarte Bots stellen die Festung gezielt an die Grenze statt
+        // irgendwo ins Landesinnere – dort verteidigt sie tatsaechlich etwas.
+        const c = L.smart ? this.borderOwnCell(p.idx, 25) : this.randomOwnCell(p.idx, 20);
         if (c >= 0 && this.canBuildAt(p.idx, c, 'fort') === null) {
           this.applyIntent({ p: p.idx, type: 'build', kind: 'fort', cell: c });
           return;
         }
       }
       if (p.ports > 0 && p.money > WARSHIP_COST + 300 &&
-          this.warships.filter(w => w.owner === p.idx).length < 2) {
+          this.warships.filter(w => w.owner === p.idx).length < L.maxWarships) {
         const port = this.buildings.find(b => b.owner === p.idx && b.kind === 'port');
         if (port) this.applyIntent({ p: p.idx, type: 'warship', cell: port.cell });
       }
@@ -1634,24 +1665,55 @@ export class Game {
       }
     }
 
-    if (neighborOwners.has(-1) && this.rng() < 0.9) {
+    if (neighborOwners.has(-1) && this.rng() < (L.smart ? 1 : 0.9)) {
       this.applyIntent({ p: p.idx, type: 'attack', target: -1, ratio: L.ratioN });
       return;
     }
-    let weakest = null;
-    for (const o of neighborOwners) {
-      if (o < 0) continue;
-      const e = this.players[o];
-      if (!e.alive || this.isAllied(p.idx, o)) continue;
-      if (!weakest || e.troops < weakest.troops) weakest = e;
-    }
-    if (weakest && p.troops > weakest.troops * L.threshold) {
-      this.applyIntent({ p: p.idx, type: 'attack', target: weakest.idx, ratio: L.ratioE });
-      return;
+
+    if (L.smart) {
+      // Smarte Zielauswahl: nicht einfach den Gegner mit den wenigsten
+      // Truppen picken, sondern den, der pro Zelle am GUENSTIGSTEN zu erobern
+      // ist (niedrige Truppendichte = duennes Land) – das ist genau der Faktor,
+      // der in processAttacks() die Eroberungskosten bestimmt. Ein Gegner kurz
+      // vor der Ausloeschung wird zusaetzlich bevorzugt: sein ganzes restliches
+      // Land faellt beim Todesstoss auf einen Schlag zu.
+      let best = null, bestScore = -Infinity, bestDensity = 0;
+      for (const o of neighborOwners) {
+        if (o < 0) continue;
+        const e = this.players[o];
+        if (!e.alive || this.isAllied(p.idx, o)) continue;
+        const density = e.troops / Math.max(1, e.territory);
+        const finishBonus = e.territory < 350 ? 2.5 : 1;
+        const score = finishBonus / (density + 0.4);
+        if (score > bestScore) { bestScore = score; best = e; bestDensity = density; }
+      }
+      if (best) {
+        // Angriff lohnt sich, wenn unser eingesetzter Pool die geschaetzten
+        // Frontkosten mehrfach decken kann (nicht nur "mehr Truppen insgesamt
+        // als der Gegner" – bei duennem Land reicht auch klare Unterzahl).
+        const estCellCost = ENEMY_COST_BASE + bestDensity * ENEMY_COST_DENSITY;
+        const pool = p.troops * L.ratioE;
+        if (pool > estCellCost * 6 && p.troops > best.troops * L.threshold) {
+          this.applyIntent({ p: p.idx, type: 'attack', target: best.idx, ratio: L.ratioE });
+          return;
+        }
+      }
+    } else {
+      let weakest = null;
+      for (const o of neighborOwners) {
+        if (o < 0) continue;
+        const e = this.players[o];
+        if (!e.alive || this.isAllied(p.idx, o)) continue;
+        if (!weakest || e.troops < weakest.troops) weakest = e;
+      }
+      if (weakest && p.troops > weakest.troops * L.threshold) {
+        this.applyIntent({ p: p.idx, type: 'attack', target: weakest.idx, ratio: L.ratioE });
+        return;
+      }
     }
 
     // Keine Ziele auf den eigenen Inseln -> per Boot expandieren
-    if (this.boats.filter(b => b.owner === p.idx).length < 2 && p.troops > L.boatMin) {
+    if (this.boats.filter(b => b.owner === p.idx).length < (L.smart ? 4 : 2) && p.troops > L.boatMin) {
       for (let t = 0; t < 40; t++) {
         const c = this.landCells[(this.rng() * this.landCells.length) | 0];
         if (this.owner[c] === -1 && !myIslands.has(this.map.island[c])) {
