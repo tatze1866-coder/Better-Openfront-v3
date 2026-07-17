@@ -1160,6 +1160,9 @@ function showFeedEvents() {
     } else if (e.t === 'towerShot' && e.p === myIdx && e.by !== myIdx) {
       const what = e.ammo === 'fire' ? 'Feuerpfeile' : (e.ammo === 'arrow' ? 'Pfeile' : 'Steine');
       pushFeed(`🏹 ${nm(e.by)} beschießt dich mit ${what} aus einem Turm!`, true);
+    } else if (e.t === 'towerShot' && e.by === myIdx && e.p !== myIdx) {
+      // Rueckmeldung an den Schuetzen selbst: der Schuss hat getroffen
+      pushFeed(`🎯 Turm trifft ${nm(e.p)}!`, false);
     }
   }
 }
@@ -1209,6 +1212,7 @@ function updateHud(now) {
   $('cntFactory').textContent = me ? me.factories : 0;
   $('cntTower').textContent = me ? me.towers : 0;
   updateBuildPrices();
+  updateTowerPanel(); // zeigt/versteckt das schwebende Turm-Feld je nach Turmbestand
 
   const phaseEl = $('phaseInfo');
   if (game.phase === 'spawn') {
@@ -1570,11 +1574,33 @@ function clearCatapultSelection() {
 let selectedTower = null; // Zelle des ausgewählten eigenen Turms, sonst null
 let towerAmmo = 'stone';  // zuletzt gewählte Munition
 
+// Hat der Spieler mindestens einen fertig gebauten (nicht mehr im Bau
+// befindlichen) eigenen Turm? Nur dann lohnt sich das Kontrollfeld.
+function hasReadyTower() {
+  if (!game || myIdx < 0) return false;
+  for (const b of game.buildings) {
+    if (b.kind === 'tower' && b.owner === myIdx && !game.underConstruction(b)) return true;
+  }
+  return false;
+}
+
+// Turm-Kontrollfeld: bleibt dauerhaft eingeblendet, sobald man einen
+// fertigen Turm besitzt (statt nur waehrend ein Turm ausgewaehlt ist), und
+// zeigt oben an, ob gerade ein Turm zum Feuern angelegt ("armed") ist.
 function updateTowerPanel() {
   const panel = $('towerPanel');
-  panel.classList.toggle('hidden', selectedTower === null);
+  const ready = hasReadyTower();
+  panel.classList.toggle('hidden', !ready);
+  panel.classList.toggle('armed', selectedTower !== null);
+  $('towerPanelLabel').textContent = selectedTower !== null
+    ? '🗼 Turm angelegt – Ziel anklicken!'
+    : (ready ? '🗼 Turm anklicken zum Zielen' : '🗼 Turm: Munition wählen');
   for (const [btn, ammo] of [['btnAmmoStone', 'stone'], ['btnAmmoArrow', 'arrow'], ['btnAmmoFire', 'fire']]) {
-    $(btn).classList.toggle('ammo-active', towerAmmo === ammo);
+    const el = $(btn);
+    el.classList.toggle('ammo-active', towerAmmo === ammo);
+    // Preis immer live aus TOWER_AMMO ziehen, statt ihn im HTML zu duplizieren
+    const priceEl = el.querySelector('.ammo-price');
+    if (priceEl) priceEl.textContent = `${TOWER_AMMO[ammo].cost}€`;
   }
   if (renderer) renderer.towerAim = selectedTower === null ? null : { cell: selectedTower, ammo: towerAmmo };
 }

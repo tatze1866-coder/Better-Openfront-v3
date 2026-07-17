@@ -1104,10 +1104,15 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
 
   const hpBefore = tfort.hp;
   const moneyBefore = gt.players[0].money;
-  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: enemyCell }]);
+  // Direkt über applyIntent (statt turn()), damit der Truppenvergleich nicht
+  // durch das gleichzeitige Truppenwachstum (economy()) verfälscht wird.
+  const troopsBefore = gt.players[1].troops;
+  gt.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: enemyCell });
   ok('Stein beschädigt die Festung', tfort.hp === hpBefore - 1, `hp ${hpBefore} -> ${tfort.hp}`);
   ok('Stein-Schuss kostet ' + TOWER_AMMO.stone.cost + ' €',
     Math.abs((moneyBefore - TOWER_AMMO.stone.cost) - gt.players[0].money) < 1);
+  ok('Stein-Schuss kostet den Gegner auch Truppen (nicht nur das Gebäude)',
+    gt.players[1].troops === troopsBefore - TOWER_AMMO.stone.troopDmg);
   ok('Turm hat jetzt Cooldown', gt.buildingAt.get(myCell).cd > 0);
 
   // Zweiter Schuss während des Cooldowns wird ignoriert (cd zaehlt nur
@@ -1115,6 +1120,23 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   const cdBefore = gt.buildingAt.get(myCell).cd;
   gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: enemyCell }]);
   ok('Zweiter Schuss während Cooldown wird ignoriert', gt.buildingAt.get(myCell).cd === cdBefore - 1);
+
+  // Stein/Pfeil auf leeres Gegnerland ohne Gebäude: vorher passierte hier
+  // gar nichts (der eigentlich gemeldete Bug "Turm schießt nicht"), jetzt
+  // kostet der Treffer trotzdem Truppen.
+  for (let i = 0; i < 10; i++) gt.turn([]);
+  let emptyEnemyCell = -1;
+  for (let c = 0; c < gt.owner.length; c++) {
+    if (c !== enemyCell && gt.map.terrain[c] === 1 && !gt.buildingAt.has(c) &&
+        gt.dist2(myCell, c) <= TOWER_RANGE * TOWER_RANGE) { emptyEnemyCell = c; break; }
+  }
+  gt.setOwner(emptyEnemyCell, 1);
+  // Turm-Cooldown zurücksetzen, damit der Schuss nicht ignoriert wird
+  gt.buildingAt.get(myCell).cd = 0;
+  const troopsBefore2 = gt.players[1].troops;
+  gt.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'arrow', target: emptyEnemyCell });
+  ok('Pfeil trifft auch leeres Gegnerland (ohne Gebäude)',
+    gt.players[1].troops === troopsBefore2 - TOWER_AMMO.arrow.troopDmg);
 
   // Cooldown abwarten, dann Feuerpfeil auf ein zweites Gegnerfeld
   for (let i = 0; i < 45; i++) gt.turn([]);

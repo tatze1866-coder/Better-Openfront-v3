@@ -5,6 +5,20 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versione
 
 ## [Unreleased]
 
+### Behoben
+- **Turm griff Gegner faktisch nicht an**: Stein/Pfeil beschädigten bisher
+  ausschließlich Gebäude im Aufschlagsradius – auf leerem Gegnerland (der
+  Regelfall abseits von Städten/Festungen) passierte sichtbar gar nichts.
+  Jeder Treffer auf gegnerisches Gebiet kostet den Getroffenen jetzt zusätzlich
+  Truppen (Stein: 3, Pfeil: 6 – einmalig pro Schuss, nicht pro Zelle im
+  Radius), unabhängig davon, ob dort ein Gebäude steht.
+
+### Geändert
+- Das Turm-Kontrollfeld ist jetzt ein permanent schwebendes Panel (rechts
+  oben, über allem anderen), das erscheint, sobald man einen fertig gebauten
+  Turm besitzt – statt nur, solange ein Turm ausgewählt ist. Es zeigt jetzt
+  auch die Munitionspreise direkt an den Buttons an.
+
 ### Hinzugefügt
 - **Neues Gebäude: Turm** 🗼 – stationäres Verteidigungs-/Angriffsgebäude
   (350 €, Reichweite 14 Zellen, wie eine Festung auf eigenem Gebiet baubar).

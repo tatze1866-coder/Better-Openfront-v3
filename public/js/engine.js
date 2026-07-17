@@ -139,10 +139,13 @@ const CATAPULT_SEEK_R2 = 1600;       // sucht selbständig Festungen im Radius 4
 export const TOWER_RANGE = 14;       // Schussweite des Turms
 const TOWER_RANGE2 = TOWER_RANGE * TOWER_RANGE;
 export const TOWER_BUILDING_HP = 2;         // Nicht-Festungsgebäude: Treffer bis zur Zerstörung
+// troopDmg: Truppenschaden pro getroffener gegnerischer Zelle im Radius –
+// dadurch tut ein Schuss auch dann etwas sichtbares, wenn dort kein Gebaeude
+// steht (vorher: Stein/Pfeil richteten auf leerem Gegnerland gar nichts an).
 export const TOWER_AMMO = {
-  stone: { cost: 15, radius: 2, reload: 10 },
-  arrow: { cost: 40, radius: 4, reload: 20 },
-  fire:  { cost: 90, radius: 3, reload: 40 },
+  stone: { cost: 15, radius: 2, reload: 10, troopDmg: 3 },
+  arrow: { cost: 40, radius: 4, reload: 20, troopDmg: 6 },
+  fire:  { cost: 90, radius: 3, reload: 40, troopDmg: 0 },
 };
 
 // Boote
@@ -783,6 +786,7 @@ export class Game {
     const tx = target % w, ty = (target / w) | 0;
     const R = cfg.radius, r2 = R * R;
     let victim = -1;
+    const troopHitOwners = new Set(); // je Schuss max. 1x Truppenschaden pro Gegner
     for (let y = Math.max(0, ty - R); y <= Math.min(h - 1, ty + R); y++) {
       for (let x = Math.max(0, tx - R); x <= Math.min(w - 1, tx + R); x++) {
         const dx = x - tx, dy = y - ty;
@@ -797,6 +801,17 @@ export class Game {
           if (!this.ruins.some(r => r.cell === c)) this.ruins.push({ cell: c });
           this.dirty.push(c);
         } else {
+          // Truppenschaden: einmalig pro getroffenem Gegner, auch wenn dort
+          // kein Gebaeude steht – vorher passierte auf leerem Gegnerland
+          // schlicht nichts, was sich wie "Turm schiesst nicht" anfuehlte.
+          const co = this.owner[c];
+          if (co >= 0 && co !== p.idx && !this.isAllied(co, p.idx) &&
+              cfg.troopDmg > 0 && !troopHitOwners.has(co)) {
+            troopHitOwners.add(co);
+            const victimP = this.players[co];
+            victimP.troops -= Math.min(victimP.troops, cfg.troopDmg);
+            if (victim < 0) victim = co;
+          }
           const b = this.buildingAt.get(c);
           if (!b || b.owner === p.idx || this.isAllied(b.owner, p.idx)) continue;
           if (victim < 0) victim = b.owner;
