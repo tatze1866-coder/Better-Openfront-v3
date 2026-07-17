@@ -26,6 +26,14 @@ const settings = {
 
 // Einstellungen beim Start anwenden
 applyStaticTranslations();
+applyAnimations();
+
+// Animations-Einstellung anwenden: schaltet dekorative UI-Effekte ab
+// (Geld-Popups-Animation, Übergänge, Hover-Zoom der Farbfelder). Rein
+// kosmetisch – Simulation und Karten-Rendering laufen unverändert.
+function applyAnimations() {
+  document.body.classList.toggle('no-anim', settings.animations !== 'on');
+}
 
 // Sprachsegment aktualisieren
 function updateLangSeg() {
@@ -121,6 +129,7 @@ $('animSeg').addEventListener('click', e => {
   settings.animations = btn.dataset.anim;
   localStorage.setItem('ofAnimations', settings.animations);
   updateAnimSeg();
+  applyAnimations();
 });
 
 // FPS-Anzeige
@@ -184,6 +193,9 @@ const fpsDisplayEl = document.createElement('div');
 fpsDisplayEl.id = 'fpsDisplay';
 fpsDisplayEl.className = 'hidden';
 $('game').appendChild(fpsDisplayEl);
+// Gespeicherte FPS-Einstellung sofort anwenden (nicht erst beim Öffnen des
+// Settings-Dialogs) – sonst bleibt die Anzeige nach einem Reload versteckt.
+updateFpsSeg();
 updateFpsSeg();
 
 // FPS messen und anzeigen
@@ -734,8 +746,9 @@ const BUILD_KINDS = [
 const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik' };
 const KIND_EMOJI = { city: '🏙', fort: '🛡', port: '⚓', factory: '🏭' };
 
-// Bildpfad je nach gewähltem Gebäude-Grafikstil (altes Wappen-Set / neues
-// Insel-Set). settings.buildingStyle: 'v1' (alt) oder 'v2' (neu, Default).
+// Bildpfad je nach gewähltem Gebäude-Grafikstil: 'v1' = altes Wappen-Set,
+// 'v2' = neues Insel-Set. Für 'orig' (Emoji, Default) wird diese Funktion
+// nicht benutzt – die Aufrufer prüfen das vorher (siehe buildBtnHtml).
 function iconPath(kind) {
   const folder = settings.buildingStyle === 'v1' ? 'images/buildings' : 'images/buildings_v2';
   return `${folder}/${kind}.png`;

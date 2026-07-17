@@ -3,6 +3,19 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.14.0] – 2026-07-17
+
+### Hinzugefügt
+- **Einstellungen** (Zahnrad im Menü): Sprache (Deutsch/Englisch),
+  Gebäude-Grafikstil (Emoji / Wappen / Inseln), FPS-Anzeige, Animationen
+  und ein Lautstärke-Regler (Ton folgt später). Alles wird gespeichert.
+
+### Behoben
+- **FPS-Anzeige nach Neuladen**: Die gespeicherte Einstellung wirkt jetzt
+  sofort, nicht erst nach erneutem Öffnen der Einstellungen.
+- **Animationen-Schalter wirkt**: „Aus" stoppt jetzt wirklich die
+  dekorativen Effekte (Geld-Popups, Übergänge, Hover-Zoom).
+
 ## [0.13.1] – 2026-07-16
 
 ### Geändert

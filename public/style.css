@@ -267,6 +267,16 @@ button.primary:hover { background: #f4845f; }
 #ratioLabel { width: 44px; text-align: right; font-weight: 600; color: #f4a261; }
 #hudBottom .hint { margin: 0; }
 
+/* Animationen aus (Einstellungen): dekorative Effekte stillegen. Popups und
+   Balken bleiben sichtbar, bewegen sich nur nicht mehr. */
+body.no-anim .money-pop { animation: none; }
+body.no-anim #troopFill,
+body.no-anim #troopOut { transition: none; }
+body.no-anim .color-row .color-swatch:hover { transform: none; }
+body.no-anim button { transition: none; }
+
+.settings-hint { text-align: left; margin: 6px 0 0; }
+
 /* Farbwahl: kleine klickbare Felder; gewählt = goldener Rahmen, vergeben = blass */
 .color-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
 .color-row .color-swatch {
