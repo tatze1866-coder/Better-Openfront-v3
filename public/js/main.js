@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
 import { Renderer } from './renderer.js';
 import { getLang, setLang, applyStaticTranslations, onLangChange, t } from './i18n.js';
 import * as Achievements from './achievements.js';
@@ -106,8 +106,9 @@ document.addEventListener('keydown', e => {
     closeIconPicker();
   } else if (e.key === 'Escape' && !$('profileOverlay').classList.contains('hidden')) {
     closeProfile();
-  } else if (e.key === 'Escape' && selectedWarships.size) {
+  } else if (e.key === 'Escape' && (selectedWarships.size || selectedCatapults.size)) {
     clearWarshipSelection(); // Kriegsschiff-Auswahl aufheben
+    clearCatapultSelection(); // Katapult-Auswahl aufheben
   }
 });
 
@@ -761,6 +762,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   $('lbTip').classList.add('hidden');
   $('eventFeed').innerHTML = ''; // Feed gehört zum alten Spiel
   clearWarshipSelection();       // Kriegsschiff-Auswahl gehört auch dazu
+  clearCatapultSelection();      // Katapult-Auswahl ebenso
   $('attackList').classList.add('hidden');
   // Allianz-Anfrage-Karten gehören auch zum alten Spiel -> entfernen
   for (const card of allyReqCards.values()) card.remove();
@@ -923,6 +925,8 @@ function updateBuildButtons() {
   $('canvas').style.cursor = buildMode ? 'copy' : 'crosshair';
   // Im Fabrik-Baumodus den Radius der eigenen Fabriken deutlich hervorheben
   if (renderer) renderer.factoryHint = buildMode === 'factory';
+  // Im Festungs-Baumodus den Schutzradius der Festungen deutlich hervorheben
+  if (renderer) renderer.fortHint = buildMode === 'fort';
 }
 function buildBtnHtml(bk, cost) {
   if (settings.buildingStyle === 'orig') {
@@ -1108,6 +1112,14 @@ function showFeedEvents() {
       pushFeed(`🤝 ${nm(e.a)} und ${nm(e.b)} sind jetzt verbündet`, false);
     } else if (e.t === 'unally' && e.a !== myIdx) {
       pushFeed(`🗡 ${nm(e.a)} hat die Allianz mit ${nm(e.b)} gebrochen!`, true);
+    } else if (e.t === 'fort') {
+      if (e.p === myIdx) {
+        pushFeed(t('feedFortYou', { name: nm(e.by) }), true);
+      } else if (e.by === myIdx) {
+        pushFeed(t('feedFortByMe', { name: nm(e.p) }), false);
+      } else if (e.by >= 0 && e.p >= 0) {
+        pushFeed(t('feedFortOther', { by: nm(e.by), name: nm(e.p) }), false);
+      }
     }
   }
 }
@@ -1496,10 +1508,23 @@ function clearWarshipSelection() {
   setWarshipSelection([]);
 }
 
+// Dasselbe fuer Katapulte (Land-Einheiten): eigene Katapulte anklicken /
+// per Rechteck auswaehlen, dann ein Ziel an Land anklicken.
+let selectedCatapults = new Set();
+
+function setCatapultSelection(ids) {
+  selectedCatapults = new Set(ids);
+  if (renderer) renderer.selectedCatapultIds = selectedCatapults;
+}
+
+function clearCatapultSelection() {
+  setCatapultSelection([]);
+}
+
 // Shift-Auswahlrechteck in Bildschirmkoordinaten (null = keins aktiv)
 let selectRect = null;
 
-// Rechteck auswerten: alle eigenen Kriegsschiffe im Rahmen auswählen
+// Rechteck auswerten: alle eigenen Kriegsschiffe UND Katapulte im Rahmen auswählen
 function finishRectSelect() {
   const r = selectRect;
   selectRect = null;
@@ -1508,22 +1533,37 @@ function finishRectSelect() {
   const xMin = Math.min(r.x0, r.x1), xMax = Math.max(r.x0, r.x1);
   const yMin = Math.min(r.y0, r.y1), yMax = Math.max(r.y0, r.y1);
   const w = game.map.w;
+  // Zellmitte einer Einheit in Bildschirmkoordinaten im Rahmen?
+  const inRect = cell => {
+    const sx = renderer.ox + (cell % w + 0.5) * renderer.scale;
+    const sy = renderer.oy + (((cell / w) | 0) + 0.5) * renderer.scale;
+    return sx >= xMin && sx <= xMax && sy >= yMin && sy <= yMax;
+  };
   const ids = [];
   for (const ws of game.warships) {
     if (ws.owner !== myIdx) continue;
-    // Zellmitte des Schiffs in Bildschirmkoordinaten
-    const sx = renderer.ox + (ws.cell % w + 0.5) * renderer.scale;
-    const sy = renderer.oy + (((ws.cell / w) | 0) + 0.5) * renderer.scale;
-    if (sx >= xMin && sx <= xMax && sy >= yMin && sy <= yMax) ids.push(ws.id);
+    if (inRect(ws.cell)) ids.push(ws.id);
   }
-  if (!ids.length) {
-    showToast('Keine eigenen Kriegsschiffe im Rechteck.');
+  const cpIds = [];
+  for (const cp of game.catapults) {
+    if (cp.owner !== myIdx) continue;
+    if (inRect(cp.cell)) cpIds.push(cp.id);
+  }
+  if (!ids.length && !cpIds.length) {
+    showToast('Keine eigenen Kriegsschiffe oder Katapulte im Rechteck.');
     return;
   }
   setWarshipSelection(ids);
-  showToast(ids.length === 1
-    ? 'Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴'
-    : `${ids.length} Kriegsschiffe ausgewählt – Ziel auf dem Wasser anklicken. ⛴`);
+  setCatapultSelection(cpIds);
+  if (ids.length && cpIds.length) {
+    showToast(t('unitsSelectedMany', { n: ids.length + cpIds.length }));
+  } else if (cpIds.length) {
+    showToast(cpIds.length === 1 ? t('catapultSelectedOne') : t('catapultSelectedMany', { n: cpIds.length }));
+  } else {
+    showToast(ids.length === 1
+      ? 'Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴'
+      : `${ids.length} Kriegsschiffe ausgewählt – Ziel auf dem Wasser anklicken. ⛴`);
+  }
 }
 
 // Eigenes Kriegsschiff nahe der Klickzelle (großzügiger Fangradius)
@@ -1534,6 +1574,18 @@ function ownWarshipAt(cell) {
     if (w.owner !== myIdx) continue;
     const d = game.dist2(w.cell, cell);
     if (d <= 9 && d < bestD) { bestD = d; best = w; }
+  }
+  return best;
+}
+
+// Eigenes Katapult nahe der Klickzelle (großzügiger Fangradius)
+function ownCatapultAt(cell) {
+  if (cell < 0) return null;
+  let best = null, bestD = Infinity;
+  for (const cp of game.catapults) {
+    if (cp.owner !== myIdx) continue;
+    const d = game.dist2(cp.cell, cell);
+    if (d <= 9 && d < bestD) { bestD = d; best = cp; }
   }
   return best;
 }
@@ -1577,6 +1629,27 @@ canvas.addEventListener('pointerup', e => {
         return;
       }
       clearWarshipSelection(); // Klick an Land: Auswahl aufheben, normal weiter
+    }
+    // Katapult-Steuerung: eigene Katapulte anklicken, dann Ziel an Land
+    const cp = ownCatapultAt(cell);
+    if (cp) {
+      // Einzelklick ersetzt die Auswahl; erneuter Klick hebt sie auf.
+      const wasOnly = selectedCatapults.size === 1 && selectedCatapults.has(cp.id);
+      setCatapultSelection(wasOnly ? [] : [cp.id]);
+      if (selectedCatapults.size) showToast(t('catapultSelectedOne'));
+      return;
+    }
+    if (selectedCatapults.size) {
+      if (cell >= 0 && game.map.terrain[cell] === 1) {
+        // Ein Intent pro Katapult – jedes rechnet seinen eigenen Landweg
+        for (const id of selectedCatapults) sendIntent({ type: 'catapult_move', ship: id, cell });
+        showToast(selectedCatapults.size === 1
+          ? t('catapultEnRouteOne')
+          : t('catapultEnRouteMany', { n: selectedCatapults.size }));
+        clearCatapultSelection();
+        return;
+      }
+      clearCatapultSelection(); // Klick ins Wasser: Auswahl aufheben, normal weiter
     }
   }
 
@@ -1729,6 +1802,23 @@ function buildCtxItems(owner, cell) {
         action: () => {
           sendIntent({ type: 'warship', cell: ownPort.cell });
           showToast('Kriegsschiff läuft vom Stapel! ⛴');
+        }
+      });
+    }
+    // Eigene Fabrik in der Nähe? -> Katapult bauen
+    const ownFactory = game.buildings.find(b =>
+      b.kind === 'factory' && b.owner === myIdx && game.dist2(b.cell, cell) <= 9);
+    if (ownFactory) {
+      const me = game.players[myIdx];
+      const capped = game.catapults.filter(x => x.owner === myIdx).length >= me.factories * 2;
+      const tooPoor = me.money < CATAPULT_COST;
+      items.push({
+        label: t('buildCatapultLabel', { cost: CATAPULT_COST }),
+        disabled: capped || tooPoor,
+        hint: capped ? t('maxCatapults') : tooPoor ? t('notEnoughMoneyShort') : '',
+        action: () => {
+          sendIntent({ type: 'catapult', cell: ownFactory.cell });
+          showToast(t('catapultLaunched'));
         }
       });
     }

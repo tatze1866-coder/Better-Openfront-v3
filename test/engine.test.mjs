@@ -59,7 +59,7 @@ for (let c = 0; c < g.owner.length; c++) {
 g.turn([{ p: 0, type: 'build', kind: 'fort', cell: fortCell }]);
 ok('Festung gebaut', g.players[0].forts === 1);
 for (let i = 0; i < 50; i++) g.turn([]); // Aufbauzeit (5s) abwarten
-ok('Festungs-Bonus wirkt (5x)', g.fortBonus(fortCell, 0) === 5 && g.fortBonus(myCell, 0) >= 1);
+ok('Festungs-Bonus wirkt (8x)', g.fortBonus(fortCell, 0) === 8 && g.fortBonus(myCell, 0) >= 1);
 
 // Boot auf fremde Insel
 let boatTarget = -1;
@@ -786,7 +786,7 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   gb.applyIntent({ p: 0, type: 'build', kind: 'fort', cell: fortCell });
   ok('Festung im Aufbau schützt nicht', gb.fortBonus(fortCell, 0) === 1);
   for (let i = 0; i < 50; i++) gb.turn([]);
-  ok('Festung nach 5s: 5x Verteidigung', gb.fortBonus(fortCell, 0) === 5);
+  ok('Festung nach 5s: 8x Verteidigung', gb.fortBonus(fortCell, 0) === 8);
 }
 
 // ---- Spiel 12g: Vergeltung – Angriffe bleiben nicht ungestraft ----
@@ -887,7 +887,7 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Eine Stadt trägt +25.000 Bevölkerung', gc.maxTroopsOf(p) - base === 25000,
     `+${gc.maxTroopsOf(p) - base} pro Stadt`);
 
-  // Festung: 5x im Radius 30, kein Stapeln, außerhalb wirkungslos
+  // Festung: 8x im Radius 30, kein Stapeln, außerhalb wirkungslos
   const W = gc.map.w;
   const home = gc.landCells.find(c => gc.owner[c] === 0);
   const hx = home % W, hy = (home / W) | 0;
@@ -898,11 +898,11 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     return cell;
   };
   const f1 = put('fort', 0, 0);
-  ok('Festung: 5x Verteidigung am Standort', gc.fortBonus(f1, 0) === 5);
-  ok('Festung wirkt im Radius 30', gc.fortBonus(f1 + 29, 0) === 5);
+  ok('Festung: 8x Verteidigung am Standort', gc.fortBonus(f1, 0) === 8);
+  ok('Festung wirkt im Radius 30', gc.fortBonus(f1 + 29, 0) === 8);
   ok('Festung wirkt nicht mehr bei 31', gc.fortBonus(f1 + 31, 0) === 1);
   put('fort', 10, 0); // zweite Festung, Radien überlappen
-  ok('Mehrere Festungen stapeln nicht', gc.fortBonus(f1 + 5, 0) === 5,
+  ok('Mehrere Festungen stapeln nicht', gc.fortBonus(f1 + 5, 0) === 8,
     `Bonus bei zwei überlappenden Festungen: ${gc.fortBonus(f1 + 5, 0)}x`);
 }
 
@@ -972,6 +972,96 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   gw.applyIntent({ p: 0, type: 'warship_move', ship: w2.id, cell: target });
   ok('Befehl setzt Kurs NUR beim zweiten Schiff', w2.order === target && w2.path.length > 0);
   ok('Erstes Schiff bleibt ohne Befehl', w1.order === -1);
+}
+
+// ---- Spiel 16: Ruinen (zerstörte Festungen) ----
+{
+  const gr = newGame(101);
+  while (gr.phase === 'spawn') gr.turn([]);
+  const W = gr.map.w;
+  const home = gr.landCells.find(c => gr.owner[c] === 0);
+  // Festung direkt platzieren (ohne Preis/Aufbauzeit)
+  const b = { owner: 0, kind: 'fort', cell: home, hp: 3 };
+  gr.buildings.push(b); gr.buildingAt.set(home, b);
+  gr.players[0].forts = 1;
+  ok('Ruine: zu Beginn keine vorhanden', gr.ruins.length === 0);
+  // Zelle wird von Spieler 1 erobert -> Festung fällt in Trümmer
+  gr.setOwner(home, 1);
+  ok('Eroberte Festung wird zerstört, nicht übernommen',
+    !gr.buildingAt.has(home) && gr.players[0].forts === 0 && gr.players[1].forts === 0);
+  ok('Ruine liegt auf der Festungszelle', gr.ruins.some(r => r.cell === home));
+  ok('Feed meldet die Zerstörung', gr.feedEvents.some(e => e.t === 'fort' && e.p === 0 && e.by === 1));
+  ok('Trümmer-Malus wirkt am Standort', gr.ruinMult(home) === 2);
+  // Zellen in 8 bzw. 12 Zellen Abstand (Richtung mit Platz wählen)
+  const hx = home % W, hy = (home / W) | 0;
+  const d8 = hx + 8 < W ? 8 : -8, d12 = hx + 12 < W ? 12 : -12;
+  ok('Trümmer-Malus wirkt im Radius 10', gr.ruinMult(hy * W + hx + d8) === 2);
+  ok('Trümmer-Malus endet außerhalb', gr.ruinMult(hy * W + hx + d12) === 1);
+  // Neubau auf der Zelle räumt die Ruine ab
+  gr.setOwner(home, 0);
+  gr.players[0].money = 10000;
+  gr.applyIntent({ p: 0, type: 'build', kind: 'city', cell: home });
+  ok('Neubau räumt die Ruine ab', gr.ruins.length === 0 && gr.buildingAt.get(home).kind === 'city');
+}
+
+// ---- Spiel 17: Katapult (Bau, Wegpunkt, Beschuss) ----
+{
+  const gk = newGame(103);
+  while (gk.phase === 'spawn') gk.turn([]);
+  const p = gk.players[0];
+  // Bots ruhigstellen (kein Gebiet, keine Truppen -> keine Störung des Tests)
+  gk.clearPlayerCells(1); gk.clearPlayerCells(2);
+  gk.players[1].troops = 0; gk.players[2].troops = 0;
+
+  // Fabrik direkt platzieren (ohne built-Zeitstempel = sofort nutzbar)
+  const home = gk.landCells.find(c => gk.owner[c] === 0);
+  const fac = { owner: 0, kind: 'factory', cell: home };
+  gk.buildings.push(fac); gk.buildingAt.set(home, fac);
+  p.factories = 1;
+
+  p.money = 1000;
+  gk.applyIntent({ p: 0, type: 'catapult', cell: home });
+  ok('Katapult gebaut (500 €)', gk.catapults.length === 1 && p.money <= 500);
+  const cp = gk.catapults[0];
+  ok('Katapult startet an der Fabrik', cp.cell === home);
+  gk.applyIntent({ p: 0, type: 'catapult', cell: home });
+  ok('Zweites Katapult erlaubt (Limit 2/Fabrik)', gk.catapults.length === 2);
+  gk.applyIntent({ p: 0, type: 'catapult', cell: home });
+  ok('Drittes Katapult über dem Limit abgelehnt', gk.catapults.length === 2);
+  const m0 = p.money;
+  p.money = 0;
+  gk.applyIntent({ p: 0, type: 'catapult', cell: home });
+  ok('Katapult ohne Geld abgelehnt', gk.catapults.length === 2 && p.money === 0);
+  p.money = m0;
+
+  // Fremder Spieler darf es nicht steuern
+  gk.applyIntent({ p: 1, type: 'catapult_move', ship: cp.id, cell: home });
+  ok('Fremdes Katapult nicht steuerbar', cp.order === -1);
+
+  // Erreichbares, entferntes Landziel suchen
+  let target = -1;
+  for (const c of gk.landCells) {
+    if (gk.dist2(c, home) >= 100 && gk.bfsLand([home], q => q === c)) { target = c; break; }
+  }
+  ok('Land-Wegpunkt gefunden', target >= 0);
+  gk.applyIntent({ p: 0, type: 'catapult_move', ship: cp.id, cell: target });
+  ok('Wegpunkt gesetzt', cp.order === target && cp.path.length > 0);
+  let arrived = false;
+  for (let i = 0; i < 800 && !arrived; i++) {
+    gk.turn([]);
+    arrived = gk.dist2(cp.cell, target) <= 2;
+  }
+  ok('Katapult erreicht den Wegpunkt', arrived, `Distanz² am Ende: ${gk.dist2(cp.cell, target)}`);
+
+  // Beschuss: feindliche Festung in Schussweite (≤ 8) platzieren
+  const fcell = gk.landCells.find(c => c !== cp.cell && gk.dist2(c, cp.cell) <= 36);
+  ok('Festungsziel in Schussweite gefunden', fcell !== undefined);
+  const fort = { owner: 1, kind: 'fort', cell: fcell, hp: 3 };
+  gk.buildings.push(fort); gk.buildingAt.set(fcell, fort);
+  gk.players[1].forts = 1;
+  for (let i = 0; i < 60 && gk.buildingAt.get(fcell) === fort; i++) gk.turn([]);
+  ok('Katapult zerstört Festung nach 3 Treffern', !gk.buildingAt.has(fcell) && gk.players[1].forts === 0);
+  ok('Zerschossene Festung hinterlässt eine Ruine', gk.ruins.some(r => r.cell === fcell));
 }
 
 console.log(results.join('\n'));

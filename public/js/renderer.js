@@ -6,7 +6,7 @@
 // EIN Bild hochskaliert. So muss pro Frame nicht jede Zelle einzeln gezeichnet
 // werden; geaendert wird nur, was sich wirklich veraendert hat (markDirty).
 
-import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS } from './engine.js';
+import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS, FORT_RADIUS, CATAPULT_RANGE, FORT_HP } from './engine.js';
 import { hash2 } from './rng.js';
 
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
@@ -24,6 +24,12 @@ function hexToRgb(hex) {
 // Farbe abdunkeln (Faktor f < 1) – fuer die dunkleren Grenzkanten der Reiche.
 function darken(rgb, f) {
   return [rgb[0] * f | 0, rgb[1] * f | 0, rgb[2] * f | 0];
+}
+
+// Hex-Farbe mit Alpha als rgba()-String (z.B. fuer Radius-Ringe).
+function hexA(hex, a) {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 // Grosse Zahlen kompakt formatieren (1.2M, 3.4k …) fuer die Badges.
@@ -68,10 +74,12 @@ export class Renderer {
     // ob gerade der Fabrik-Baumodus laeuft (dann Radius deutlicher zeichnen).
     this.myIdx = -1;
     this.factoryHint = false;
+    this.fortHint = false;      // Festungs-Baumodus: Radius-Ringe deutlicher + Vorschau
     this.buildingStyle = 'orig'; // 'orig' = Emoji/Formen, 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
     this.animations = true;   // von main.js gesetzt (Einstellung "Animationen")
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
     this.selectedWarshipIds = new Set(); // per Klick/Rechteck ausgewaehlte eigene Kriegsschiffe
+    this.selectedCatapultIds = new Set(); // per Klick/Rechteck ausgewaehlte eigene Katapulte
     this.selectRect = null; // Shift-Auswahlrechteck in Bildschirmkoordinaten ({x0,y0,x1,y1})
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
@@ -582,6 +590,48 @@ export class Renderer {
       ctx.restore();
     }
 
+    // Schutzradius ALLER fertigen Festungen andeuten (Besitzerfarbe, dezent) –
+    // wichtige Information fuers Angriffsziel. Im Festungs-Baumodus werden die
+    // eigenen Ringe kraeftiger und eine goldene Vorschau folgt dem Cursor.
+    {
+      const strong = this.fortHint;
+      ctx.save();
+      ctx.setLineDash([2.5, 2.5]);
+      for (const b of g.buildings) {
+        if (b.kind !== 'fort' || g.underConstruction(b)) continue;
+        const own = b.owner === this.myIdx;
+        ctx.lineWidth = own && strong ? 0.9 : 0.4;
+        ctx.strokeStyle = hexA(g.players[b.owner].color, own && strong ? 0.85 : 0.3);
+        ctx.beginPath();
+        ctx.arc(cx(b.cell), cy(b.cell), FORT_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (strong && this.hoverCell >= 0) {
+        ctx.lineWidth = 0.9;
+        ctx.strokeStyle = 'rgba(255, 214, 10, 0.9)';
+        ctx.beginPath();
+        ctx.arc(cx(this.hoverCell), cy(this.hoverCell), FORT_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Trümmerfelder zerstörter Festungen: dunkler Schutt-Haufen
+    for (const r of g.ruins) {
+      const x = cx(r.cell), y = cy(r.cell);
+      ctx.fillStyle = '#3a3630';
+      ctx.beginPath();
+      ctx.moveTo(x - 2.2, y + 1.6);
+      ctx.lineTo(x - 0.9, y - 1.4);
+      ctx.lineTo(x + 0.2, y + 0.2);
+      ctx.lineTo(x + 1.3, y - 1.8);
+      ctx.lineTo(x + 2.3, y + 1.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#57524a';
+      ctx.fillRect(x - 0.7, y - 0.6, 1.5, 1.2);
+    }
+
     // Gebaeude-Icons: im Standard-Stil ('orig') die urspruenglichen, per Code
     // gezeichneten Formen (Haeuserzeile/Turm/Anker/Halle); im Wappen- bzw.
     // Insel-Stil ('v1'/'v2') das Badge-Bild, umrandet von einem Ring in
@@ -670,6 +720,14 @@ export class Renderer {
         ctx.fillRect(x - 3, y + 3.4, 6, 1);
         ctx.fillStyle = '#ffd60a';
         ctx.fillRect(x - 3, y + 3.4, 6 * t, 1);
+      }
+      // Beschädigte Festung (von Katapult beschossen): kleiner Lebensbalken
+      if (b.kind === 'fort' && b.hp !== undefined && b.hp < FORT_HP) {
+        const frac = Math.max(0, b.hp / FORT_HP);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(x - 3, y - 4.6, 6, 0.9);
+        ctx.fillStyle = frac > 0.5 ? '#38b000' : '#e63946';
+        ctx.fillRect(x - 3, y - 4.6, 6 * frac, 0.9);
       }
     }
     ctx.globalAlpha = 1;
@@ -786,6 +844,53 @@ export class Renderer {
       ctx.fillRect(x - 2.4, y - 2.4, 4.8, 0.7);
       ctx.fillStyle = frac > 0.5 ? '#38b000' : '#e63946';
       ctx.fillRect(x - 2.4, y - 2.4, 4.8 * frac, 0.7);
+    }
+
+    // Katapulte (Belagerungs-Einheiten zu Land): Gestell mit Rädern und
+    // Wurfarm in Besitzerfarbe. Ausgewählte eigene Katapulte bekommen einen
+    // goldenen Ring, eine Linie/Marke zum Wegpunkt und den Reichweiten-Ring.
+    for (const cp of g.catapults) {
+      const x = cx(cp.cell), y = cy(cp.cell);
+      const col = g.players[cp.owner].color;
+      if (this.selectedCatapultIds.has(cp.id) && cp.owner === this.myIdx) {
+        if (cp.order >= 0) {
+          const ox = cx(cp.order), oy = cy(cp.order);
+          ctx.strokeStyle = 'rgba(244,162,97,0.7)';
+          ctx.lineWidth = 0.5;
+          ctx.setLineDash([1.5, 1.5]);
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ox, oy); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(ox, oy, 1.6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        // Schussweite andeuten
+        ctx.strokeStyle = 'rgba(244,162,97,0.35)';
+        ctx.lineWidth = 0.4;
+        ctx.beginPath(); ctx.arc(x, y, CATAPULT_RANGE, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#f4a261';
+        ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.arc(x, y, 3.6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Räder
+      ctx.fillStyle = '#2b2016';
+      ctx.beginPath(); ctx.arc(x - 1.5, y + 1.5, 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 1.5, y + 1.5, 0.9, 0, Math.PI * 2); ctx.fill();
+      // Gestell (Dreieck) in Besitzerfarbe mit hellem Rand
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(x - 2.1, y + 1.3); ctx.lineTo(x, y - 2.3); ctx.lineTo(x + 2.1, y + 1.3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x - 1.4, y + 1.1); ctx.lineTo(x, y - 1.5); ctx.lineTo(x + 1.4, y + 1.1);
+      ctx.closePath(); ctx.fill();
+      // Wurfarm (schräger Strich) + Schleuderkelle
+      ctx.strokeStyle = '#2b2016';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.moveTo(x - 0.6, y - 0.2); ctx.lineTo(x + 1.6, y - 2.6); ctx.stroke();
+      ctx.fillStyle = '#2b2016';
+      ctx.beginPath(); ctx.arc(x + 1.7, y - 2.7, 0.7, 0, Math.PI * 2); ctx.fill();
     }
   }
 }

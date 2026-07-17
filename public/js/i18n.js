@@ -220,6 +220,17 @@ const dict = {
   notEnoughMoneyShort: { de: 'Nicht genug Geld.', en: 'Not enough money.' },
   warshipLaunched: { de: 'Kriegsschiff läuft vom Stapel! ⛴', en: 'Warship launched! ⛴' },
   buildKindLabel: { de: '{kind} bauen ({cost}€)', en: 'Build {kind} ({cost}€)' },
+  buildCatapultLabel: { de: '🏹 Katapult bauen ({cost}€)', en: '🏹 Build catapult ({cost}€)' },
+  maxCatapults: { de: 'Maximal 2 Katapulte je Fabrik.', en: 'Maximum of 2 catapults per factory.' },
+  catapultLaunched: { de: 'Katapult gebaut! 🏹', en: 'Catapult built! 🏹' },
+  catapultSelectedOne: { de: 'Katapult ausgewählt – Ziel an Land anklicken. 🏹', en: 'Catapult selected – click a target on land. 🏹' },
+  catapultSelectedMany: { de: '{n} Katapulte ausgewählt – Ziel an Land anklicken. 🏹', en: '{n} catapults selected – click a target on land. 🏹' },
+  catapultEnRouteOne: { de: 'Katapult unterwegs! 🏹', en: 'Catapult en route! 🏹' },
+  catapultEnRouteMany: { de: '{n} Katapulte unterwegs! 🏹', en: '{n} catapults en route! 🏹' },
+  unitsSelectedMany: { de: '{n} Einheiten ausgewählt – Ziel anklicken.', en: '{n} units selected – click a target.' },
+  feedFortYou: { de: '🏰 Deine Festung wurde von {name} zerstört!', en: '🏰 Your fort was destroyed by {name}!' },
+  feedFortByMe: { de: '🏰 Festung von {name} zerstört', en: '🏰 Fort of {name} destroyed' },
+  feedFortOther: { de: '🏰 {by} hat eine Festung von {name} zerstört', en: '🏰 {by} destroyed a fort of {name}' },
 
   // Fehlercodes von engine.js (canBuildAt)
   errNotOwnTerritory: { de: 'Nur auf eigenem Gebiet baubar.', en: 'Can only build on your own territory.' },

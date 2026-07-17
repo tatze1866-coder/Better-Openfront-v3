@@ -71,8 +71,14 @@ const COST_DOUBLINGS_CAP = { city: 4, fort: 3, port: 3, factory: 3 };
 export const WARSHIP_COST = 300;
 const KIND_FIELD = { city: 'cities', fort: 'forts', port: 'ports', factory: 'factories' };
 const CITY_MAX_BONUS = 25000;        // Stadt: +max. Truppen (wichtigstes Gebäude)
-const FORT_RADIUS2 = 900;            // Festung schützt im Radius 30
-const FORT_DEFENSE = 5;              // Eroberung dort 5x so teuer (stapelt nicht)
+export const FORT_RADIUS = 30;       // Schutzradius einer Festung in Zellen
+const FORT_RADIUS2 = FORT_RADIUS * FORT_RADIUS;
+const FORT_DEFENSE = 8;              // Eroberung dort 8x so teuer (stapelt nicht)
+export const FORT_HP = 3;            // Katapult-Treffer bis zur Zerstörung
+// Ruinen: eine zerstörte Festung hinterlässt ein Trümmerfeld – die (Rück-)
+// Eroberung im Umkreis kostet RUIN_COST-mal so viele Truppen.
+const RUIN_RADIUS2 = 100;            // Trümmerfeld-Radius 10
+const RUIN_COST = 2;
 const MIN_BUILD_DIST2 = 100;         // Mindestabstand 10 zwischen eigenen Gebäuden
 const PORT_SNAP_RADIUS = 8;          // Hafen-Klick springt bis zu 8 Zellen zur Küste
 export const BUILD_DEPLOY_TICKS = 50; // 5s Aufbauzeit: Gebäude wirken erst danach
@@ -111,6 +117,15 @@ const TRAIN_VISITS = 6;              // Stationsbesuche, dann endet der Zug
 // Geld je durchfahrener Station. Bei FREMDEN Stationen verdienen beide Seiten
 // (der Zug-Besitzer und der Stationsbesitzer) – Verbündete bringen am meisten.
 const TRAIN_PAY = { own: 12, foreign: 24, ally: 36 };
+
+// Katapulte (Belagerungs-Einheit aus der Fabrik, fährt zu Land)
+export const CATAPULT_COST = 500;
+const CATAPULT_CAP_PER_FACTORY = 2;  // max. aktive Katapulte je Fabrik
+const CATAPULT_SPEED = 1;            // Landzellen pro Tick
+export const CATAPULT_RANGE = 8;     // Schussweite gegen Festungen
+const CATAPULT_RANGE2 = CATAPULT_RANGE * CATAPULT_RANGE;
+const CATAPULT_SHOT_CD = 15;         // Ticks zwischen Schüssen
+const CATAPULT_SEEK_R2 = 1600;       // sucht selbständig Festungen im Radius 40
 
 // Boote
 export const MAX_BOATS = 3;
@@ -179,6 +194,9 @@ export class Game {
     this.tradeShips = [];          // Handelsschiffe zwischen Häfen
     this.warships = [];            // Kriegsschiffe
     this.warshipSeq = 0;           // laufende ID für Kriegsschiffe (für Befehle)
+    this.catapults = [];           // Katapulte (Belagerungs-Einheiten zu Land)
+    this.catapultSeq = 0;          // laufende ID für Katapulte (für Befehle)
+    this.ruins = [];               // Trümmerfelder zerstörter Festungen ({ cell })
     this.trains = [];              // Züge auf Schienennetzen
     // Schienennetz-Graph, jede Runde neu berechnet (siehe buildRailNetwork):
     // adj = Zelle -> Nachbarknoten, edges = Kantenliste fürs Zeichnen
@@ -310,17 +328,26 @@ export class Game {
     if (prev >= 0) this.players[prev].territory--;
     this.owner[cell] = p;
     if (p >= 0) this.players[p].territory++;
-    // Gebäude wechseln mit der Zelle den Besitzer
+    // Gebäude wechseln mit der Zelle den Besitzer – AUSNAHME Festungen:
+    // sie werden bei Eroberung zerstört und hinterlassen eine Ruine.
     const b = this.buildingAt.get(cell);
     if (b) {
-      if (b.owner >= 0) this.players[b.owner][KIND_FIELD[b.kind]]--;
-      if (p >= 0) {
-        b.owner = p;
-        this.players[p][KIND_FIELD[b.kind]]++;
+      if (b.kind === 'fort') {
+        this.destroyFort(b, p);
       } else {
-        this.buildingAt.delete(cell);
-        this.buildings = this.buildings.filter(x => x !== b);
+        if (b.owner >= 0) this.players[b.owner][KIND_FIELD[b.kind]]--;
+        if (p >= 0) {
+          b.owner = p;
+          this.players[p][KIND_FIELD[b.kind]]++;
+        } else {
+          this.buildingAt.delete(cell);
+          this.buildings = this.buildings.filter(x => x !== b);
+        }
       }
+    }
+    // Katapulte auf einer feindlich eroberten Zelle werden zerstört
+    for (const cp of this.catapults) {
+      if (cp.cell === cell && cp.owner !== p && (p < 0 || !this.isAllied(cp.owner, p))) cp.dead = true;
     }
     this.dirty.push(cell);
   }
@@ -459,10 +486,14 @@ export class Game {
         p.money -= this.buildCostOf(p.idx, kind);
         // built = Bauzeitpunkt: das Gebäude ist erst nach BUILD_DEPLOY_TICKS
         // wirksam (siehe underConstruction). Preiszähler zählen sofort.
+        // Festungen bekommen Trefferpunkte (Katapulte schießen sie ab).
         const b = { owner: p.idx, kind, cell: c, built: this.turnNo };
+        if (kind === 'fort') b.hp = FORT_HP;
         this.buildings.push(b);
         this.buildingAt.set(c, b);
         p[KIND_FIELD[kind]]++;
+        // Neubau räumt ein evtl. vorhandenes Trümmerfeld auf dieser Zelle ab
+        this.ruins = this.ruins.filter(r => r.cell !== c);
         break;
       }
       // Kriegsschiff an einem eigenen Hafen bauen (max. 2 je Hafen)
@@ -502,6 +533,36 @@ export class Game {
         w.order = c;
         w.home = c; // neues Patrouillenzentrum: nach Ankunft bleibt das Schiff dort
         w.path = path; w.pi = 0;
+        break;
+      }
+      // Katapult an einer eigenen Fabrik bauen (max. 2 je Fabrik)
+      case 'catapult': {
+        if (this.phase !== 'play') return;
+        const c = it.cell | 0;
+        const b = this.buildingAt.get(c);
+        if (!b || b.kind !== 'factory' || b.owner !== p.idx) return;
+        if (this.underConstruction(b)) return; // Fabrik erst nach der Aufbauzeit nutzbar
+        if (p.money < CATAPULT_COST) return;
+        if (this.catapults.filter(x => x.owner === p.idx).length >= p.factories * CATAPULT_CAP_PER_FACTORY) return;
+        p.money -= CATAPULT_COST;
+        this.catapults.push({ id: this.catapultSeq++, owner: p.idx, home: c, cell: c, path: [], pi: 0, cd: CATAPULT_SHOT_CD, born: this.turnNo, order: -1 });
+        break;
+      }
+      // Einem eigenen Katapult ein Ziel (Landzelle) zuweisen – analog
+      // 'warship_move'. Der Wegpunkt hat Vorrang vor der automatischen
+      // Festungssuche und gilt, bis das Katapult ihn erreicht hat.
+      // Auch hier heißt das ID-Feld bewusst "ship" (siehe warship_move und
+      // den Hinweis in server.js).
+      case 'catapult_move': {
+        if (this.phase !== 'play') return;
+        const cp = this.catapults.find(x => x.id === (it.ship | 0));
+        if (!cp || cp.owner !== p.idx) return;
+        const c = it.cell | 0;
+        if (c < 0 || c >= this.map.terrain.length || this.map.terrain[c] !== 1) return;
+        const path = this.bfsLand([cp.cell], q => q === c);
+        if (!path) return;
+        cp.order = c;
+        cp.path = path; cp.pi = 0;
         break;
       }
       // Allianz anfragen bzw. eine offene Gegenanfrage annehmen
@@ -636,6 +697,25 @@ export class Game {
     return 1;
   }
 
+  // Eine Festung zerstören: Gebäude weg, Zähler runter, Ruine auf der Zelle,
+  // Meldung im Ereignis-Feed. byIdx = wer sie zerstört hat (-1 = niemand).
+  destroyFort(b, byIdx = -1) {
+    if (b.owner >= 0) this.players[b.owner].forts--;
+    this.feedEvents.push({ t: 'fort', p: b.owner, by: byIdx });
+    this.buildingAt.delete(b.cell);
+    this.buildings = this.buildings.filter(x => x !== b);
+    this.ruins.push({ cell: b.cell });
+  }
+
+  // Trümmer-Malus für eine Zelle: liegt sie im Radius einer Ruine, kostet
+  // ihre Eroberung RUIN_COST-mal so viele Truppen.
+  ruinMult(cell) {
+    for (const r of this.ruins) {
+      if (this.dist2(r.cell, cell) <= RUIN_RADIUS2) return RUIN_COST;
+    }
+    return 1;
+  }
+
   // ---------- Boote ----------
   // BFS über Wasser von den eigenen Küsten zur Ziel-Insel.
   // Bevorzugt eine Landung auf Zellen des angeklickten Besitzers,
@@ -704,7 +784,7 @@ export class Game {
       }
       const defender = o >= 0 ? this.players[o] : null;
       const density = defender ? defender.troops / Math.max(1, defender.territory) : 0;
-      const cost = (defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST) * this.fortBonus(cell, o);
+      const cost = (defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST) * this.fortBonus(cell, o) * this.ruinMult(cell);
       if (boat.troops <= cost) continue; // Landung abgewehrt
       let pool = boat.troops - cost;
       if (defender) {
@@ -753,6 +833,34 @@ export class Game {
       for (let i = 0; i < k; i++) {
         const m = nb[i];
         if (terrain[m] === 0 && prev[m] === -2) { prev[m] = c; queue[tail++] = m; }
+      }
+    }
+    return null;
+  }
+
+  // Dasselbe zu Land: kuerzesten Weg ueber Landzellen finden (fuer Katapulte).
+  bfsLand(sources, goalFn) {
+    const { terrain } = this.map;
+    const n = this.owner.length;
+    const prev = new Int32Array(n).fill(-2);
+    const queue = new Int32Array(n);
+    let head = 0, tail = 0;
+    for (const s of sources) {
+      if (terrain[s] === 1 && prev[s] === -2) { prev[s] = -1; queue[tail++] = s; }
+    }
+    const nb = new Int32Array(4);
+    while (head < tail) {
+      const c = queue[head++];
+      if (goalFn(c)) {
+        const path = [];
+        for (let x = c; x !== -1; x = prev[x]) path.push(x);
+        path.reverse();
+        return path;
+      }
+      const k = this.neighbors4(c, nb);
+      for (let i = 0; i < k; i++) {
+        const m = nb[i];
+        if (terrain[m] === 1 && prev[m] === -2) { prev[m] = c; queue[tail++] = m; }
       }
     }
     return null;
@@ -946,6 +1054,70 @@ export class Game {
     this.warships = this.warships.filter(w => !w.dead);
   }
 
+  // ---------- Katapulte ----------
+  // Neues Ziel/Route fuer ein Katapult festlegen. Prioritaet: Spieler-
+  // Wegpunkt (order); sonst die naechste feindliche Festung im Suchradius
+  // ansteuern (bis auf Schussweite heran). Kein Ziel -> stehen bleiben.
+  retargetCatapult(cp) {
+    let goal = null;
+    if (cp.order >= 0) {
+      // Spieler-Wegpunkt: dorthin fahren; angekommen -> Befehl erledigt
+      if (this.dist2(cp.cell, cp.order) <= 2) {
+        cp.order = -1;
+      } else {
+        const target = cp.order;
+        goal = c => c === target;
+      }
+    }
+    if (!goal) {
+      // Naechste feindliche (nicht verbuendete) Festung im Suchradius
+      let fort = null, fortD = Infinity;
+      for (const b of this.buildings) {
+        if (b.kind !== 'fort' || b.owner === cp.owner || this.isAllied(b.owner, cp.owner)) continue;
+        if (!this.players[b.owner].alive) continue;
+        const d = this.dist2(b.cell, cp.cell);
+        if (d < fortD && d <= CATAPULT_SEEK_R2) { fortD = d; fort = b; }
+      }
+      if (fort) {
+        const fc = fort.cell;
+        goal = c => this.dist2(c, fc) <= CATAPULT_RANGE2;
+      }
+    }
+    if (goal) {
+      const path = this.bfsLand([cp.cell], goal);
+      if (path) { cp.path = path; cp.pi = 0; }
+    }
+  }
+
+  // Katapulte pro Tick: Kurs setzen, bewegen (1 Zelle/Tick) und in Reichweite
+  // auf feindliche Festungen schiessen (FORT_HP Treffer -> Ruine).
+  processCatapults() {
+    for (const cp of this.catapults) {
+      if (!this.players[cp.owner].alive) { cp.dead = true; continue; }
+      // Kurs setzen / erneuern
+      if (cp.pi >= cp.path.length || this.turnNo % 25 === cp.born % 25) {
+        this.retargetCatapult(cp);
+      }
+      if (cp.pi < cp.path.length) cp.cell = cp.path[cp.pi++];
+      // Schießen: naechste feindliche Festung in Reichweite
+      if (--cp.cd <= 0) {
+        let target = null, targetD = Infinity;
+        for (const b of this.buildings) {
+          if (b.kind !== 'fort' || b.owner === cp.owner || this.isAllied(b.owner, cp.owner)) continue;
+          if (!this.players[b.owner].alive) continue;
+          const d = this.dist2(b.cell, cp.cell);
+          if (d <= CATAPULT_RANGE2 && d < targetD) { targetD = d; target = b; }
+        }
+        if (target) {
+          cp.cd = CATAPULT_SHOT_CD;
+          target.hp = (target.hp === undefined ? FORT_HP : target.hp) - 1;
+          if (target.hp <= 0) this.destroyFort(target, cp.owner);
+        }
+      }
+    }
+    this.catapults = this.catapults.filter(x => !x.dead);
+  }
+
   // ---------- Fabriken & Züge ----------
   // Alle Stationen (Staedte/Haefen) im Schienen-Radius einer Fabrik – die Ziele,
   // die ihre Zuege anfahren koennen.
@@ -1123,6 +1295,7 @@ export class Game {
     this.processBoats();
     this.processTrade();
     this.processWarships();
+    this.processCatapults();
     this.buildRailNetwork();   // Netz zuerst, damit Züge das aktuelle Netz nutzen
     this.processTrains();
     this.processAttacks();
@@ -1220,7 +1393,7 @@ export class Game {
       const baseCost = defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST;
       let captured = 0;
       for (const cell of atk.frontier) {
-        const cellCost = baseCost * this.fortBonus(cell, atk.target);
+        const cellCost = baseCost * this.fortBonus(cell, atk.target) * this.ruinMult(cell);
         if (atk.pool < cellCost) continue; // z.B. Festungszelle zu teuer
         atk.pool -= cellCost;
         if (defender) {

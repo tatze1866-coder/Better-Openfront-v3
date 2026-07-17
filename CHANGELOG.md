@@ -3,6 +3,31 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.17.0] – 2026-07-17
+
+### Hinzugefügt
+- **Neue Einheit: Katapult** 🏹 – Belagerungsgeschütz, das an der eigenen
+  Fabrik gebaut wird (500 €, max. 2 je Fabrik, Rechtsklick-Menü nahe der
+  Fabrik). Katapulte funktionieren wie Kriegsschiffe: anklicken (oder per
+  Shift-Rechteck mehrere) und ein Ziel an Land schicken. Ohne Befehl suchen
+  sie selbständig die nächste feindliche Festung im Umkreis und beschießen
+  sie aus der Distanz – drei Treffer zerstören eine Festung. Vorsicht: Ein
+  Katapult auf erobertem Gebiet geht verloren.
+- **Ruinen**: Zerstörte Festungen bleiben als Trümmerfeld auf der Karte
+  liegen. Die (Rück-)Eroberung im Umkreis kostet doppelt so viele Truppen;
+  beschädigte Festungen zeigen einen Lebensbalken. Ein Neubau auf der Zelle
+  räumt die Ruine ab.
+- **Festungs-Radius sichtbar**: Jede fertige Festung zeigt ihren
+  Schutzradius als feinen Ring in der Besitzerfarbe. Im Baumodus (Taste 2)
+  werden die eigenen Ringe kräftiger und eine goldene Vorschau folgt dem
+  Cursor – wie schon bei der Fabrik.
+
+### Geändert
+- **Festungen deutlich robuster**: Eroberungen im Schutzradius kosten jetzt
+  das Achtfache statt des Fünffachen an Truppen.
+- **Eroberte Festungen werden zerstört** statt den Besitzer zu wechseln –
+  sie hinterlassen eine Ruine (siehe oben).
+
 ## [0.16.3] – 2026-07-17
 
 ### Geändert
