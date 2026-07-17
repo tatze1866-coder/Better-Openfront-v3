@@ -44,6 +44,11 @@ for (const kind of ['city', 'fort', 'port', 'factory']) {
   im.src = `images/buildings/${kind}.png`;
   BUILDING_ICONS[kind] = im;
 }
+// Zug-Sprite (Dampflok, passend zum Wappen-Stil der Gebaeude-Badges).
+// Die Front (Laterne/Bugräumer) zeigt im Bild nach links; beim Zeichnen wird
+// die Lok in Fahrtrichtung gedreht.
+const TRAIN_IMG = new Image();
+TRAIN_IMG.src = 'images/units/train.png';
 
 export class Renderer {
   constructor(canvas, game) {
@@ -498,13 +503,35 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
-    // Züge auf den Schienen
+    // Züge auf den Schienen: Dampflok-Sprite, in Fahrtrichtung gedreht, mit
+    // einem kleinen Wimpel in Spielerfarbe an der Kabine (zeigt den Besitzer).
     for (const tr of g.trains) {
       const [tx, ty] = g.trainPos(tr);
-      ctx.fillStyle = '#2b2016';
-      ctx.fillRect(tx - 1.4, ty - 0.9, 2.8, 1.8);
-      ctx.fillStyle = g.players[tr.owner].color;
-      ctx.fillRect(tx - 0.8, ty - 0.4, 1.6, 0.8);
+      const fx = tr.from % w, fy = (tr.from / w) | 0;
+      const gx = tr.to % w, gy = (tr.to / w) | 0;
+      const angle = Math.atan2(gy - fy, gx - fx);
+      ctx.save();
+      ctx.translate(tx, ty);
+      // Bild-Front zeigt nach links (Winkel PI) -> auf Fahrtrichtung drehen.
+      ctx.rotate(angle - Math.PI);
+      if (TRAIN_IMG.complete && TRAIN_IMG.naturalWidth > 0) {
+        const iw = TRAIN_IMG.naturalWidth, ih = TRAIN_IMG.naturalHeight;
+        const drawW = 6.2, drawH = drawW * (ih / iw);
+        const scale = drawW / iw;
+        // Bildmitte (Lok-Koerpermitte, nicht Bild-Mitte) auf den Ursprung legen
+        const originX = iw * 0.40, originY = ih * 0.52;
+        ctx.drawImage(TRAIN_IMG, -originX * scale, -originY * scale, iw * scale, ih * scale);
+        // Wimpel an der Kabine in Spielerfarbe (Kabine liegt bei ~72% der Bildbreite)
+        ctx.fillStyle = g.players[tr.owner].color;
+        ctx.fillRect((iw * 0.70 - originX) * scale, (ih * 0.18 - originY) * scale, drawW * 0.14, drawH * 0.16);
+      } else {
+        // Fallback, solange das Sprite noch laedt
+        ctx.fillStyle = '#2b2016';
+        ctx.fillRect(-1.4, -0.9, 2.8, 1.8);
+        ctx.fillStyle = g.players[tr.owner].color;
+        ctx.fillRect(-0.8, -0.4, 1.6, 0.8);
+      }
+      ctx.restore();
     }
 
     // Handelsschiffe (kleine Kreise)
