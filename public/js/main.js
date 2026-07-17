@@ -1148,6 +1148,11 @@ function updateHud(now) {
   // Truppenanstieg pro Sekunde – orange markiert
   $('growthLabel').textContent = me && me.alive ? ` +${fmt(game.troopGrowthOf(me) * 10)}/s` : '';
   $('moneyLabel').textContent = me ? fmt(me.money) : '0';
+  // Eigene Gebäudezahlen je Typ in der unteren Leiste
+  $('cntCity').textContent = me ? me.cities : 0;
+  $('cntFort').textContent = me ? me.forts : 0;
+  $('cntPort').textContent = me ? me.ports : 0;
+  $('cntFactory').textContent = me ? me.factories : 0;
   updateBuildPrices();
 
   const phaseEl = $('phaseInfo');

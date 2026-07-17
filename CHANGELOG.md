@@ -3,6 +3,13 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.16.2] – 2026-07-17
+
+### Hinzugefügt
+- **Gebäudezahlen im HUD**: Die eigene Leiste unten zeigt jetzt dauerhaft,
+  wie viele Gebäude man je Typ besitzt (🏙 Städte, 🛡 Festungen, ⚓ Häfen,
+  🏭 Fabriken) – live aktualisiert, mit Tooltip beim Draufzeigen.
+
 ## [0.16.1] – 2026-07-17
 
 ### Hinzugefügt

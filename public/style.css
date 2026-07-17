@@ -236,6 +236,9 @@ button.primary:hover { background: #f4845f; }
 #growthLabel { color: #f4a261; font-weight: 700; font-size: 14px; }
 #moneyInfo { font-size: 16px; position: relative; }
 #moneyInfo b { color: #ffd60a; }
+/* Eigene Gebäudezahlen in der unteren Leiste */
+#buildInfo { font-size: 16px; display: flex; gap: 12px; }
+#buildInfo b { color: #e8eef4; }
 /* Einnahme-Popups: stapeln sich über der Geldanzeige, das Neuste unten */
 #moneyPops {
   position: absolute;
