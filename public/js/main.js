@@ -4,6 +4,7 @@
 import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK } from './engine.js';
 import { Renderer } from './renderer.js';
 import { getLang, setLang, applyStaticTranslations, onLangChange, t } from './i18n.js';
+import * as Achievements from './achievements.js';
 
 const $ = id => document.getElementById(id);
 
@@ -256,6 +257,7 @@ $('profileNameInput').addEventListener('input', () => {
 function openProfile() {
   updateBuildingStyleSeg();
   $('profileNameInput').value = $('nameInput').value;
+  updateAchievementsPanel();
   $('profileOverlay').classList.remove('hidden');
 }
 function closeProfile() {
@@ -330,7 +332,7 @@ $('iconPickerOverlay').addEventListener('click', e => {
   if (e.target === $('iconPickerOverlay')) closeIconPicker();
 });
 
-// Tabs im Profil-Dialog (Player / Skins / Statistiken / Spielverlauf)
+// Tabs im Profil-Dialog (Player / Skins / Statistiken / Spielverlauf / Erfolge)
 $('profileOverlay').querySelectorAll('.profile-nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const panel = btn.dataset.panel;
@@ -338,7 +340,28 @@ $('profileOverlay').querySelectorAll('.profile-nav-btn').forEach(btn => {
     $('profileOverlay').querySelectorAll('.profile-panel').forEach(p => {
       p.classList.toggle('hidden', p.dataset.panel !== panel);
     });
+    if (panel === 'achievements') updateAchievementsPanel();
   });
+});
+
+// Erfolge-Liste + Kopfzeile ("X / Y Erfolgsstufen freigeschaltet") neu aufbauen
+function updateAchievementsPanel() {
+  Achievements.renderAchievements($('achievementsList'));
+  $('achievementsSummary').textContent = t('achSummary', {
+    n: Achievements.unlockedTierCount(),
+    total: Achievements.totalTierCount(),
+  });
+}
+
+// Neue Erfolgsstufe freigeschaltet -> kurzer Toast (unabhängig davon, ob das
+// Profil gerade offen ist). Falls das Erfolge-Panel gerade sichtbar ist, gleich
+// mit aktualisieren, damit der Fortschrittsbalken live mitzieht.
+Achievements.onUnlock((fam, tierIdx) => {
+  showToast(`🏆 ${t('achUnlockedPrefix')}: ${t(`ach_${fam.id}_name`)} ${Achievements.TIER_LABELS[tierIdx]}`);
+  if (!$('profileOverlay').classList.contains('hidden') &&
+      !$('profileOverlay').querySelector('.profile-panel[data-panel="achievements"]').classList.contains('hidden')) {
+    updateAchievementsPanel();
+  }
 });
 
 // ---------- Menü ----------
@@ -735,6 +758,7 @@ function startGame(seed, players, idx, isOnline, mapCfg = {}) {
   updateBuildButtons();
   game = new Game({ seed, players, mapType: mapCfg.mapType, mapSize: mapCfg.mapSize });
   window.__game = game; // Debug-Zugriff (Konsole)
+  Achievements.onGameStart();
   const canvas = $('canvas');
   renderer = new Renderer(canvas, game);
   renderer.buildingStyle = settings.buildingStyle;
@@ -772,7 +796,10 @@ function processTurnQueue() {
 // Renderer melden und pruefen, ob das Spiel vorbei ist.
 function stepTurn(intents) {
   if (!game || game.phase === 'ended') return;
+  const meBefore = game.players[myIdx];
+  const territoryBefore = meBefore ? meBefore.territory : 0;
   game.turn(intents);
+  Achievements.onTurnProcessed(game, myIdx, territoryBefore);
   showMoneyPops();
   showFeedEvents();
   if (renderer && game.dirty.length) {
@@ -785,6 +812,7 @@ function stepTurn(intents) {
 // Eigene Eingabe abschicken: online an den Server, offline direkt in den lokalen
 // Puffer fuer den naechsten Zug.
 function sendIntent(d) {
+  Achievements.onIntent(d);
   if (online) wsSend({ t: 'intent', d });
   else localPending.push({ p: myIdx, ...d });
 }
@@ -792,6 +820,7 @@ function sendIntent(d) {
 function checkGameEnd() {
   const me = game.players[myIdx];
   if (game.winners) {
+    Achievements.onGameEnd(game, myIdx);
     // Spielende (ein Spieler/eine Allianz hat ≥70% Land oder ist als Einzige übrig)
     const iWon = game.winners.includes(myIdx);
     const names = game.winners.map(i => game.players[i].name).join(', ');
