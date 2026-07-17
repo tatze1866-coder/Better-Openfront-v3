@@ -68,7 +68,7 @@ export class Renderer {
     // ob gerade der Fabrik-Baumodus laeuft (dann Radius deutlicher zeichnen).
     this.myIdx = -1;
     this.factoryHint = false;
-    this.buildingStyle = 'v2'; // 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
+    this.buildingStyle = 'orig'; // 'orig' = Emoji/Formen, 'v1' = altes Wappen-Set, 'v2' = neues Insel-Set
     this.hoverCell = -1;    // Zelle unter dem Cursor (fuer die Radius-Vorschau)
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
@@ -474,10 +474,10 @@ export class Renderer {
       ctx.restore();
     }
 
-    // Gebaeude-Icons: Wappen-Badge-Bild (Stadt/Festung/Hafen/Fabrik), umrandet
-    // von einem Ring in Spielerfarbe (zeigt den Besitzer auch bei kleinem Zoom).
-    // Solange ein Bild noch nicht geladen ist, zeichnen wir ersatzweise einen
-    // einfachen gefuellten Kreis in Spielerfarbe.
+    // Gebaeude-Icons: im Standard-Stil ('orig') die urspruenglichen, per Code
+    // gezeichneten Formen (Haeuserzeile/Turm/Anker/Halle); im Wappen- bzw.
+    // Insel-Stil ('v1'/'v2') das Badge-Bild, umrandet von einem Ring in
+    // Spielerfarbe (zeigt den Besitzer auch bei kleinem Zoom).
     const ICON_R = 3.4; // Radius des Icons in Kartenzellen (~wie vorher)
     for (const b of g.buildings) {
       const x = cx(b.cell), y = cy(b.cell);
@@ -486,21 +486,70 @@ export class Renderer {
       const deploying = g.underConstruction(b);
       if (deploying) ctx.globalAlpha = 0.45;
 
-      // Besitzer-Ring als Kontrast-/Farbtraeger hinter dem Badge
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.arc(x, y, ICON_R, 0, Math.PI * 2);
-      ctx.fill();
-
-      const im = BUILDING_ICONS[this.buildingStyle][b.kind];
-      if (im && im.complete && im.naturalWidth > 0) {
-        const d = ICON_R * 1.8; // Badge etwas kleiner als der Ring darunter
-        ctx.save();
+      if (this.buildingStyle === 'orig') {
+        // Urspruengliche Silhouetten: weiss als Kontrast, darin dasselbe
+        // Motiv kleiner in Spielerfarbe.
+        if (b.kind === 'city') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 2.9, y - 1, 2, 3.6);
+          ctx.fillRect(x - 1.1, y - 2.7, 2.2, 5.3);
+          ctx.fillRect(x + 0.9, y - 1.7, 2, 4.3);
+          ctx.fillStyle = col;
+          ctx.fillRect(x - 2.45, y - 0.5, 1.1, 2.6);
+          ctx.fillRect(x - 0.65, y - 2.2, 1.3, 4.3);
+          ctx.fillRect(x + 1.35, y - 1.2, 1.1, 3.3);
+        } else if (b.kind === 'fort') {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(x, y, 2.9, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = col;
+          ctx.fillRect(x - 1.6, y - 1.1, 3.2, 3.1);
+          ctx.fillRect(x - 1.6, y - 2, 0.9, 1);
+          ctx.fillRect(x - 0.45, y - 2, 0.9, 1);
+          ctx.fillRect(x + 0.7, y - 2, 0.9, 1);
+        } else if (b.kind === 'port') {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(x, y - 3); ctx.lineTo(x + 3, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 3, y);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(x, y - 1.5, 0.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(x - 0.35, y - 1.2, 0.7, 3);
+          ctx.fillRect(x - 1.4, y - 0.6, 2.8, 0.6);
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.moveTo(x - 1.7, y + 0.9);
+          ctx.quadraticCurveTo(x, y + 3.1, x + 1.7, y + 0.9);
+          ctx.stroke();
+        } else if (b.kind === 'factory') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 2.7, y - 1.7, 5.4, 4.3);
+          ctx.fillRect(x + 0.7, y - 3.4, 1.8, 2);
+          ctx.fillStyle = col;
+          ctx.fillRect(x - 2.1, y - 1.1, 4.2, 3.1);
+          ctx.fillRect(x + 1.05, y - 3, 1.1, 1.9);
+        }
+      } else {
+        // Besitzer-Ring als Kontrast-/Farbtraeger hinter dem Badge
+        ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.arc(x, y, ICON_R * 0.92, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(im, x - d / 2, y - d / 2, d, d);
-        ctx.restore();
+        ctx.arc(x, y, ICON_R, 0, Math.PI * 2);
+        ctx.fill();
+
+        const im = BUILDING_ICONS[this.buildingStyle][b.kind];
+        if (im && im.complete && im.naturalWidth > 0) {
+          const d = ICON_R * 1.8; // Badge etwas kleiner als der Ring darunter
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(x, y, ICON_R * 0.92, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(im, x - d / 2, y - d / 2, d, d);
+          ctx.restore();
+        }
       }
       if (deploying) {
         const t = Math.min(1, (g.turnNo - b.built) / BUILD_DEPLOY_TICKS);
@@ -513,10 +562,18 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
-    // Züge auf den Schienen: Dampflok-Sprite, in Fahrtrichtung gedreht, mit
-    // einem kleinen Wimpel in Spielerfarbe an der Kabine (zeigt den Besitzer).
+    // Züge auf den Schienen: im Standard-Stil das urspruengliche einfache
+    // Rechteck, sonst die Dampflok-Sprite (gedreht in Fahrtrichtung, mit
+    // Wimpel in Spielerfarbe an der Kabine).
     for (const tr of g.trains) {
       const [tx, ty] = g.trainPos(tr);
+      if (this.buildingStyle === 'orig') {
+        ctx.fillStyle = '#2b2016';
+        ctx.fillRect(tx - 1.4, ty - 0.9, 2.8, 1.8);
+        ctx.fillStyle = g.players[tr.owner].color;
+        ctx.fillRect(tx - 0.8, ty - 0.4, 1.6, 0.8);
+        continue;
+      }
       const fx = tr.from % w, fy = (tr.from / w) | 0;
       const gx = tr.to % w, gy = (tr.to / w) | 0;
       const angle = Math.atan2(gy - fy, gx - fx);
