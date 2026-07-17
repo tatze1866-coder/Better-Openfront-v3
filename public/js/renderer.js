@@ -478,15 +478,19 @@ export class Renderer {
     // gezeichneten Formen (Haeuserzeile/Turm/Anker/Halle); im Wappen- bzw.
     // Insel-Stil ('v1'/'v2') das Badge-Bild, umrandet von einem Ring in
     // Spielerfarbe (zeigt den Besitzer auch bei kleinem Zoom).
+    // WICHTIG: Der gewaehlte Stil gilt nur fuer die eigenen Gebaeude – Bots,
+    // andere Nationen und herrenlose Gebaeude bleiben immer beim Standard
+    // (Emoji/Formen), damit sich der eigene Skin klar vom Rest abhebt.
     const ICON_R = 3.4; // Radius des Icons in Kartenzellen (~wie vorher)
     for (const b of g.buildings) {
       const x = cx(b.cell), y = cy(b.cell);
       const col = b.owner >= 0 ? g.players[b.owner].color : '#888';
+      const style = (b.owner === this.myIdx) ? this.buildingStyle : 'orig';
       // Im Aufbau: Icon halbtransparent, darunter ein kleiner Fortschrittsbalken
       const deploying = g.underConstruction(b);
       if (deploying) ctx.globalAlpha = 0.45;
 
-      if (this.buildingStyle === 'orig') {
+      if (style === 'orig') {
         // Urspruengliche Silhouetten: weiss als Kontrast, darin dasselbe
         // Motiv kleiner in Spielerfarbe.
         if (b.kind === 'city') {
@@ -540,7 +544,7 @@ export class Renderer {
         ctx.arc(x, y, ICON_R, 0, Math.PI * 2);
         ctx.fill();
 
-        const im = BUILDING_ICONS[this.buildingStyle][b.kind];
+        const im = BUILDING_ICONS[style][b.kind];
         if (im && im.complete && im.naturalWidth > 0) {
           const d = ICON_R * 1.8; // Badge etwas kleiner als der Ring darunter
           ctx.save();
@@ -564,10 +568,12 @@ export class Renderer {
 
     // Züge auf den Schienen: im Standard-Stil das urspruengliche einfache
     // Rechteck, sonst die Dampflok-Sprite (gedreht in Fahrtrichtung, mit
-    // Wimpel in Spielerfarbe an der Kabine).
+    // Wimpel in Spielerfarbe an der Kabine). Auch hier gilt der gewaehlte
+    // Skin nur fuer die eigenen Zuege.
     for (const tr of g.trains) {
       const [tx, ty] = g.trainPos(tr);
-      if (this.buildingStyle === 'orig') {
+      const trainStyle = (tr.owner === this.myIdx) ? this.buildingStyle : 'orig';
+      if (trainStyle === 'orig') {
         ctx.fillStyle = '#2b2016';
         ctx.fillRect(tx - 1.4, ty - 0.9, 2.8, 1.8);
         ctx.fillStyle = g.players[tr.owner].color;
