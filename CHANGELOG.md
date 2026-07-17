@@ -3,6 +3,15 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.14.2] – 2026-07-17
+
+### Geändert
+- **Größere Landmassen im Zufalls-Archipel**: Das Gelände-Rauschen bildet
+  gröbere Strukturen und Splitter-Inseln unter 400 Zellen entfallen –
+  z.B. auf mittlerer Karte ~9-14 Inseln statt 30-40, auf der riesigen
+  ~70 statt ~240. Landanteil und die Preset-Karten (Weltkarte & Co.)
+  bleiben unverändert.
+
 ## [0.14.1] – 2026-07-17
 
 ### Geändert

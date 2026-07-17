@@ -101,8 +101,10 @@ function generateRandomTerrain(seed, w, h) {
       // Normierte Koordinaten -1..1 und Abstand r zur Kartenmitte
       const nx = (x / w) * 2 - 1, ny = (y / h) * 2 - 1;
       const r = Math.sqrt(nx * nx + ny * ny);
-      // Schwacher Radial-Abfall: mehrere Inseln statt eines Kontinents
-      heights[y * w + x] = fractal(x, y, seed) * 0.9 + (1 - r) * 0.24;
+      // Schwacher Radial-Abfall: mehrere Inseln statt eines Kontinents.
+      // Die Koordinaten werden gestaucht (x0.55), damit das Rauschen groebere
+      // Strukturen bildet: wenige grosse Landmassen statt vieler Splitter.
+      heights[y * w + x] = fractal(x * 0.55, y * 0.55, seed) * 0.9 + (1 - r) * 0.24;
     }
   }
   // Schwellwert anpassen, bis der Landanteil passt: alles ueber dem Schwellwert
@@ -213,7 +215,9 @@ export function generateMap(seed, w, h, type = 'random') {
   const view = MAP_VIEWS[type];
   const terrain = view ? generatePresetTerrain(seed, w, h, view) : generateRandomTerrain(seed, w, h);
   // Preset-Karten behalten kleine Inseln (GB, Japan …), Zufallskarten nicht
-  const minIsland = view ? 12 : 100;
+  // Preset-Karten behalten kleine Inseln (GB, Japan ...); beim Zufalls-
+  // Archipel fliegen kleine Splitter-Inseln raus - groessere Landmassen.
+  const minIsland = view ? 12 : 400;
   const { island, islandSizes, landCount } = labelIslands(terrain, w, h, minIsland);
   return { w, h, terrain, landCount, island, islandSizes };
 }
