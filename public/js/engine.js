@@ -624,6 +624,10 @@ export class Game {
         if (p.money < cfg.cost) return;
         p.money -= cfg.cost;
         b.cd = cfg.reload;
+        // Fuer die Schuss-Animation im Renderer: Ziel, Munition und Turn des
+        // letzten durchgegangenen Schusses. Rein informativ und deterministisch
+        // (direkt aus dem Intent abgeleitet, kein Zufall/Timing).
+        b.lastShot = { target, ammo: it.ammo, turn: this.turnNo };
         this.applyTowerShot(p, target, it.ammo);
         break;
       }

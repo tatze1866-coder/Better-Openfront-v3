@@ -1213,7 +1213,7 @@ function updateHud(now) {
   $('cntFactory').textContent = me ? me.factories : 0;
   $('cntTower').textContent = me ? me.towers : 0;
   updateBuildPrices();
-  updateTowerPanel(); // zeigt/versteckt das schwebende Turm-Feld je nach Turmbestand
+  updateTowerPanel(); // zeigt das schwebende Turm-Feld, solange ein eigener Turm ausgewählt ist
 
   const phaseEl = $('phaseInfo');
   if (game.phase === 'spawn') {
@@ -1575,19 +1575,8 @@ function clearCatapultSelection() {
 let selectedTower = null; // Zelle des ausgewählten eigenen Turms, sonst null
 let towerAmmo = 'stone';  // zuletzt gewählte Munition
 
-// Hat der Spieler mindestens einen fertig gebauten (nicht mehr im Bau
-// befindlichen) eigenen Turm? Nur dann lohnt sich das Kontrollfeld.
-function hasReadyTower() {
-  if (!game || myIdx < 0) return false;
-  for (const b of game.buildings) {
-    if (b.kind === 'tower' && b.owner === myIdx && !game.underConstruction(b)) return true;
-  }
-  return false;
-}
-
-// Turm-Kontrollfeld: bleibt dauerhaft eingeblendet, sobald man einen
-// fertigen Turm besitzt (statt nur waehrend ein Turm ausgewaehlt ist), und
-// zeigt oben an, ob gerade ein Turm zum Feuern angelegt ("armed") ist.
+// Turm-Kontrollfeld: nur sichtbar, solange ein eigener Turm zum Zielen
+// ausgewaehlt ist (Klick auf den Turm; ✕ oder Esc waehlt wieder ab).
 function updateTowerPanel() {
   const panel = $('towerPanel');
   // Zerstörten/eroberten Turm nicht ausgewählt lassen – sonst bleibt das
@@ -1596,12 +1585,9 @@ function updateTowerPanel() {
     const b = game ? game.buildingAt.get(selectedTower) : null;
     if (!b || b.kind !== 'tower' || b.owner !== myIdx) selectedTower = null;
   }
-  const ready = hasReadyTower();
-  panel.classList.toggle('hidden', !ready);
+  panel.classList.toggle('hidden', selectedTower === null);
   panel.classList.toggle('armed', selectedTower !== null);
-  $('towerPanelLabel').textContent = selectedTower !== null
-    ? t('towerPanelAimed')
-    : (ready ? t('towerPanelSelect') : t('towerPanelChooseAmmo'));
+  $('towerPanelLabel').textContent = t('towerPanelAimed');
   for (const [btn, ammo] of [['btnAmmoStone', 'stone'], ['btnAmmoArrow', 'arrow'], ['btnAmmoFire', 'fire']]) {
     const el = $(btn);
     el.classList.toggle('ammo-active', towerAmmo === ammo);

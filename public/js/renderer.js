@@ -87,6 +87,11 @@ export class Renderer {
     // zeit (t = 0..1), keine Integration noetig. Rein visuell, kein Spielzustand.
     this.particles = [];
     this.ruinsKnown = new Set(); // Zellen bekannter Truemmerfelder (Burst nur bei NEUEN Ruinen)
+    // Fliegende Turm-Geschosse: die Engine markiert jeden durchgegangenen
+    // Schuss am Turm (b.lastShot = { target, ammo, turn }); drawProjectiles
+    // spannt daraus ein Projektil. towerShotsSeen verhindert Doppel-Starts.
+    this.projectiles = [];
+    this.towerShotsSeen = new Map(); // Turm-Zelle -> letzter animierter turn
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -488,6 +493,7 @@ export class Renderer {
     ctx.drawImage(this.off, 0, 0);       // die ganze Karte in einem Rutsch
     this.drawShimmer(ctx, now);          // pulsierende Lichtpunkte auf dem Wasser
     this.drawOverlays(ctx, now);         // Gebaeude/Schiffe/Zuege darueber
+    this.drawProjectiles(ctx, now);      // fliegende Turm-Geschosse
     this.drawParticles(ctx, now);        // Eroberungs-Funken & Ruinen-Staub
     ctx.setTransform(1, 0, 0, 1, 0, 0);  // zurueck zu Bildschirmkoordinaten
     // Vignette: dezente Abdunklung der Bildschirmraender ueber der Karte,
@@ -564,6 +570,64 @@ export class Renderer {
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Fliegende Turm-Geschosse (Kartenkoordinaten). Neue Schuesse erkennt der
+  // Renderer an b.lastShot.turn (siehe Engine 'tower_shoot'); jedes Geschoss
+  // fliegt in einem Bogen von der Turmzelle zum Ziel und verpufft dort in
+  // einem kleinen Burst in Munitionsfarbe. Laeuft auch fuer gegnerische
+  // Tuerme – so sind alle Schuesse auf der Karte sichtbar.
+  drawProjectiles(ctx, now) {
+    if (!this.animations) { this.projectiles.length = 0; return; }
+    const g = this.game, w = g.map.w;
+    for (const b of g.buildings) {
+      if (b.kind !== 'tower' || !b.lastShot) continue;
+      if (this.towerShotsSeen.get(b.cell) === b.lastShot.turn) continue;
+      this.towerShotsSeen.set(b.cell, b.lastShot.turn);
+      const x0 = b.cell % w + 0.5, y0 = ((b.cell / w) | 0) + 0.5;
+      const x1 = b.lastShot.target % w + 0.5, y1 = ((b.lastShot.target / w) | 0) + 0.5;
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      if (dist < 1) continue;
+      this.projectiles.push({
+        x0, y0, x1, y1, dist, ammo: b.lastShot.ammo, born: now,
+        dur: Math.min(1400, Math.max(320, dist * 14)), // weiter Schuss = laengerer Flug
+      });
+    }
+    if (!this.projectiles.length) return;
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const pr = this.projectiles[i];
+      const t = (now - pr.born) / pr.dur;
+      if (t >= 1) {
+        // Einschlag: kleiner Burst in Munitionsfarbe am Zielpunkt
+        const col = pr.ammo === 'fire' ? '#ff7b33' : pr.ammo === 'arrow' ? '#e8d8a8' : '#b8b0a0';
+        for (let k = 0; k < 7; k++) {
+          const ang = Math.random() * Math.PI * 2, d = 1 + Math.random() * 1.8;
+          this.particles.push({
+            x: pr.x1, y: pr.y1,
+            dx: Math.cos(ang) * d, dy: Math.sin(ang) * d - 1,
+            born: now, life: 350 + Math.random() * 250,
+            size: 0.45 + Math.random() * 0.4, alpha: 0.7, color: col,
+          });
+        }
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+      // Bahn: linear zum Ziel, darueber ein Hoehenbogen (Steilwurf-Optik);
+      // der Bogen ist bei kurzen Schuessen gedeckelt, sonst wirkt er albern.
+      const arc = Math.min(6, pr.dist * 0.22);
+      // Glutschweif: drei Punkte entlang der Bahn, der vorderste ist die Spitze
+      for (let k = 2; k >= 0; k--) {
+        const tk = Math.max(0, t - k * 0.025);
+        const kx = pr.x0 + (pr.x1 - pr.x0) * tk;
+        const ky = pr.y0 + (pr.y1 - pr.y0) * tk - Math.sin(Math.PI * tk) * arc;
+        if (pr.ammo === 'fire') ctx.fillStyle = k ? `rgba(255, 140, 60, ${0.5 - k * 0.18})` : '#ffcf6e';
+        else if (pr.ammo === 'arrow') ctx.fillStyle = k ? `rgba(230, 216, 168, ${0.42 - k * 0.14})` : '#efe6c4';
+        else ctx.fillStyle = k ? `rgba(190, 182, 168, ${0.42 - k * 0.14})` : '#cfc8ba';
+        ctx.beginPath();
+        ctx.arc(kx, ky, (pr.ammo === 'stone' ? 0.85 : 0.6) * (1 - k * 0.28), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 
   // Truppen-Badges für laufende Angriffe und Boote (in Bildschirmkoordinaten)
@@ -789,11 +853,23 @@ export class Renderer {
     // (kein Ring mehr noetig) – nur der Aufschlagsradius der gewaehlten
     // Munition wird am Cursor eingeblendet.
     if (this.towerAim) {
-      const { ammo } = this.towerAim;
+      const { cell, ammo } = this.towerAim;
       if (this.hoverCell >= 0) {
         const cfg = TOWER_AMMO[ammo] || TOWER_AMMO.stone;
+        const tb = g.buildingAt.get(cell);
+        const loaded = !!tb && !(tb.cd > 0); // schussbereit? (Nachladen = rote Linie)
         ctx.save();
-        ctx.fillStyle = ammo === 'fire' ? 'rgba(230, 57, 70, 0.28)' : 'rgba(255, 214, 10, 0.22)';
+        // Ziel-Linie vom Turm zum Cursor: gold = bereit, rot = laedt noch nach
+        ctx.strokeStyle = loaded ? 'rgba(255, 214, 10, 0.55)' : 'rgba(230, 57, 70, 0.55)';
+        ctx.lineWidth = 0.6;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(cx(cell), cy(cell));
+        ctx.lineTo(cx(this.hoverCell), cy(this.hoverCell));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = !loaded ? 'rgba(230, 57, 70, 0.22)'
+          : ammo === 'fire' ? 'rgba(230, 57, 70, 0.28)' : 'rgba(255, 214, 10, 0.22)';
         ctx.beginPath();
         ctx.arc(cx(this.hoverCell), cy(this.hoverCell), cfg.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -967,6 +1043,27 @@ export class Renderer {
         ctx.fillStyle = frac > 0.5 ? '#38b000' : '#e63946';
         ctx.fillRect(x - 3, y - 4.6, 6 * frac, 0.9);
       }
+      // Eigener fertiger Turm: schussbereit = pulsierender goldener Punkt
+      // ("kann angreifen"), sonst goldener Ladebogen fuer das Nachladen.
+      if (b.kind === 'tower' && b.owner === this.myIdx && !deploying) {
+        if (b.cd > 0) {
+          const frac = 1 - b.cd / TOWER_AMMO.stone.reload; // reload ist bei allen Munitionen gleich
+          ctx.strokeStyle = 'rgba(255, 214, 10, 0.85)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.arc(x, y, 4.3, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+          ctx.stroke();
+        } else {
+          const pulse = this.animations ? 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 340 + b.cell)) : 0.9;
+          ctx.fillStyle = `rgba(255, 214, 10, ${pulse})`;
+          ctx.beginPath();
+          ctx.arc(x, y - 5.4, 1.05, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(120, 84, 0, 0.9)';
+          ctx.lineWidth = 0.3;
+          ctx.stroke();
+        }
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -1011,15 +1108,16 @@ export class Renderer {
         }
         ctx.restore();
       }
-      // Dampfwoelkchen ueber der Lok (kosmetisch, respektiert "Animationen aus")
+      // Dampfwoelkchen ueber der Lok: drei deutlich sichtbare Puffs, je Zug
+      // phasenversetzt, die aufsteigen und auseinanderziehen.
       if (this.animations) {
-        const base = (now / 1200 + ti * 0.53) % 1;
-        for (let k = 0; k < 2; k++) {
-          const t = (base + k * 0.5) % 1;
-          ctx.globalAlpha = (1 - t) * 0.28;
-          ctx.fillStyle = '#e8e4da';
+        const base = (now / 1000 + ti * 0.53) % 1;
+        for (let k = 0; k < 3; k++) {
+          const t = (base + k / 3) % 1;
+          ctx.globalAlpha = (1 - t) * 0.6;
+          ctx.fillStyle = '#f2eee2';
           ctx.beginPath();
-          ctx.arc(tx - t * 0.7, ty - 1.6 - t * 2.3, 0.45 + t * 0.75, 0, Math.PI * 2);
+          ctx.arc(tx - t * 1.0, ty - 1.6 - t * 3.4, 0.75 + t * 1.2, 0, Math.PI * 2);
           ctx.fill();
         }
         ctx.globalAlpha = 1;

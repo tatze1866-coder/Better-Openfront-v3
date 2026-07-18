@@ -242,8 +242,6 @@ const dict = {
   ammoArrow: { de: 'Pfeil', en: 'Arrow' },
   ammoFire: { de: 'Feuerpfeil', en: 'Fire arrow' },
   towerPanelAimed: { de: '🗼 Turm angelegt – Ziel anklicken!', en: '🗼 Tower armed – click a target!' },
-  towerPanelSelect: { de: '🗼 Turm anklicken zum Zielen', en: '🗼 Click a tower to aim' },
-  towerPanelChooseAmmo: { de: '🗼 Turm: Munition wählen', en: '🗼 Tower: choose ammo' },
   towerSelected: { de: 'Turm ausgewählt – Munition wählen, dann Ziel anklicken. 🗼', en: 'Tower selected – choose ammo, then click a target. 🗼' },
   towerFired: { de: 'Turm feuert! 🏹', en: 'Tower fires! 🏹' },
   towerReloading: { de: 'Turm lädt noch nach ({secs}s) …', en: 'Tower is still reloading ({secs}s) …' },

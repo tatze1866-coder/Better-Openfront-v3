@@ -3,6 +3,26 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.20.0] – 2026-07-18
+
+### Hinzugefügt
+- **Schuss-Animation für Türme**: Geschosse fliegen jetzt sichtbar in einem
+  Bogen vom Turm zum Ziel und verpuffen dort in einem kleinen Funken-Burst
+  in Munitionsfarbe (Stein grau, Pfeil hell, Feuerpfeil glühend) – bei
+  eigenen wie bei gegnerischen Türmen.
+- **Schussbereitschaft auf der Karte**: Eigene fertige Türme zeigen einen
+  pulsierenden goldenen Punkt, sobald sie feuern können; während des
+  Nachladens füllt sich stattdessen ein goldener Ladebogen um den Turm.
+  Beim Zielen führt jetzt eine gestrichelte Linie vom Turm zum Cursor –
+  gold, wenn der Turm bereit ist, rot, solange er nachlädt.
+
+### Geändert
+- **Turm-Kontrollfeld nur noch bei Auswahl**: Das Munitions-Panel erscheint
+  erst, wenn ein eigener Turm angeklickt wurde (statt dauerhaft, sobald man
+  einen besitzt), und verschwindet mit ✕/Esc oder erneutem Klick wieder.
+- **Zugdampf deutlich sichtbarer**: drei statt zwei größere, hellere
+  Wölkchen pro Zug, die höher aufsteigen und stärker auseinanderziehen.
+
 ## [0.19.0] – 2026-07-18
 
 ### Hinzugefügt
