@@ -3,6 +3,26 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.22.0] – 2026-07-18
+
+### Hinzugefügt
+- **Einheiten- & Gebäude-Optik poliert** (ingame, Stil wie bisher):
+  - Schiffe zeigen jetzt in Fahrtrichtung: Transportboote, Handelsschiffe und
+    Kriegsschiffe sind gedrehte Silhouetten mit zugespitztem Bug und Rumpf –
+    beim Handelsschiff mit Segel-Dreieck Richtung Bug, beim Kriegsschiff mit
+    Deck in Besitzerfarbe. Liegende Kriegsschiffe behalten ihren letzten Kurs.
+  - Katapult-Beschuss sichtbar: Felsbrocken fliegen im hohen Bogen zur
+    angepeilten Festung und verpuffen dort als Staubwolke; der Wurfarm des
+    Katapults schwingt beim Schuss kurz hoch.
+  - Türme bekommen einen Mündungsblitz mit kleiner Rauchfahne, sobald ein
+    Geschoss startet (in Munitionsfarbe).
+  - Fabriken qualmen aus dem Schornstein – versetzt pro Gebäude, nur wenn
+    fertig gebaut.
+  - Städte wirken belebter: dezente Fensterpunkte und dunkle First-Linien auf
+    den Häusern.
+  - Beschädigte Festungen und Türme qualmen: unter 50 % Rest-HP leichter
+    grauer Rauch, unter 25 % dichter und dunkler.
+
 ## [0.21.1] – 2026-07-18
 
 ### Behoben

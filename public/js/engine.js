@@ -1271,6 +1271,9 @@ export class Game {
         if (target) {
           cp.cd = CATAPULT_SHOT_CD;
           target.hp = (target.hp === undefined ? FORT_HP : target.hp) - 1;
+          // Fuer die Schuss-Animation im Renderer: Ziel und Turn des letzten
+          // Schusses (analog b.lastShot bei Tuermen, deterministisch).
+          cp.lastShot = { target: target.cell, turn: this.turnNo };
           if (target.hp <= 0) this.destroyFort(target, cp.owner);
         }
       }

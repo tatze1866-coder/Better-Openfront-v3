@@ -102,6 +102,14 @@ export class Renderer {
     // spannt daraus ein Projektil. towerShotsSeen verhindert Doppel-Starts.
     this.projectiles = [];
     this.towerShotsSeen = new Map(); // Turm-Zelle -> letzter animierter turn
+    // Katapult-Schuesse: Katapult-ID -> letzter animierter turn; Arm-Anim:
+    // Katapult-ID -> Startzeit des Wurfarm-Rueckschwungs (ms, performance.now)
+    this.catapultShotsSeen = new Map();
+    this.catapultArmAnim = new Map();
+    // Letzter bekannter Kurs je Kriegsschiff-ID: damit liegen Schiffe im
+    // Stillstand nicht alle starr nach rechts, sondern behalten ihre
+    // Ausrichtung (wird wie ruinsKnown periodisch aufgeraeumt).
+    this.shipAngles = new Map();
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -628,11 +636,12 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  // Fliegende Turm-Geschosse (Kartenkoordinaten). Neue Schuesse erkennt der
-  // Renderer an b.lastShot.turn (siehe Engine 'tower_shoot'); jedes Geschoss
-  // fliegt in einem Bogen von der Turmzelle zum Ziel und verpufft dort in
-  // einem kleinen Burst in Munitionsfarbe. Laeuft auch fuer gegnerische
-  // Tuerme – so sind alle Schuesse auf der Karte sichtbar.
+  // Fliegende Geschosse (Kartenkoordinaten): Turm-Projektile und Katapult-
+  // Felsbrocken. Neue Schuesse erkennt der Renderer an b.lastShot.turn (siehe
+  // Engine 'tower_shoot') bzw. cp.lastShot.turn (siehe processCatapults);
+  // jedes Geschoss fliegt in einem Bogen zum Ziel und verpufft dort in einem
+  // kleinen Burst. Laeuft auch fuer gegnerische Einheiten – so sind alle
+  // Schuesse auf der Karte sichtbar.
   drawProjectiles(ctx, now) {
     if (!this.animations) { this.projectiles.length = 0; return; }
     const g = this.game, w = g.map.w;
@@ -648,6 +657,45 @@ export class Renderer {
         x0, y0, x1, y1, dist, ammo: b.lastShot.ammo, born: now,
         dur: Math.min(1400, Math.max(320, dist * 14)), // weiter Schuss = laengerer Flug
       });
+      // Mündungsblitz am Turm: kurzer heller Aufleucht-Blitz (in Munitions-
+      // farbe) plus eine kleine, laenger nachziehende Rauchfahne.
+      const mcol = b.lastShot.ammo === 'fire' ? '#ffb347' : b.lastShot.ammo === 'arrow' ? '#fff2c0' : '#f4e8c8';
+      for (let k = 0; k < 3; k++) {
+        this.particles.push({
+          x: x0 + (Math.random() - 0.5) * 0.6, y: y0 - 2 + (Math.random() - 0.5) * 0.6,
+          dx: (Math.random() - 0.5) * 0.8, dy: -(0.8 + Math.random() * 1.2),
+          born: now, life: 140 + Math.random() * 120,
+          size: 0.7 + Math.random() * 0.5, alpha: 0.95, color: mcol,
+        });
+      }
+      for (let k = 0; k < 2; k++) {
+        this.particles.push({
+          x: x0 + (Math.random() - 0.5) * 0.8, y: y0 - 2.4,
+          dx: (Math.random() - 0.5) * 0.5, dy: -(0.5 + Math.random() * 0.8),
+          born: now, life: 500 + Math.random() * 350,
+          size: 0.5 + Math.random() * 0.4, alpha: 0.4, color: '#c8c2b4',
+        });
+      }
+    }
+    // Katapult-Felsbrocken: schwerer, hoeher und langsamer als Turm-Geschosse.
+    // Beim Spawn wird zugleich der Wurfarm-Rueckschwung am Katapult gestartet.
+    if (this.catapultShotsSeen.size > g.catapults.length + 30) {
+      const ids = new Set(g.catapults.map(cp => cp.id));
+      for (const id of this.catapultShotsSeen.keys()) if (!ids.has(id)) this.catapultShotsSeen.delete(id);
+    }
+    for (const cp of g.catapults) {
+      if (!cp.lastShot) continue;
+      if (this.catapultShotsSeen.get(cp.id) === cp.lastShot.turn) continue;
+      this.catapultShotsSeen.set(cp.id, cp.lastShot.turn);
+      const x0 = cp.cell % w + 0.5, y0 = ((cp.cell / w) | 0) + 0.5;
+      const x1 = cp.lastShot.target % w + 0.5, y1 = ((cp.lastShot.target / w) | 0) + 0.5;
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      if (dist < 1) continue;
+      this.projectiles.push({
+        x0, y0, x1, y1, dist, ammo: 'boulder', born: now,
+        dur: Math.min(1600, Math.max(400, dist * 18)), // Wurfstein fliegt traeger
+      });
+      this.catapultArmAnim.set(cp.id, now);
     }
     if (!this.projectiles.length) return;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -655,7 +703,8 @@ export class Renderer {
       const t = (now - pr.born) / pr.dur;
       if (t >= 1) {
         // Einschlag: kleiner Burst in Munitionsfarbe am Zielpunkt
-        const col = pr.ammo === 'fire' ? '#ff7b33' : pr.ammo === 'arrow' ? '#e8d8a8' : '#b8b0a0';
+        const col = pr.ammo === 'fire' ? '#ff7b33' : pr.ammo === 'arrow' ? '#e8d8a8'
+          : pr.ammo === 'boulder' ? '#8a7a5c' : '#b8b0a0';
         for (let k = 0; k < 7; k++) {
           const ang = Math.random() * Math.PI * 2, d = 1 + Math.random() * 1.8;
           this.particles.push({
@@ -670,7 +719,8 @@ export class Renderer {
       }
       // Bahn: linear zum Ziel, darueber ein Hoehenbogen (Steilwurf-Optik);
       // der Bogen ist bei kurzen Schuessen gedeckelt, sonst wirkt er albern.
-      const arc = Math.min(6, pr.dist * 0.22);
+      // Felsbrocken fliegen sichtbar hoeher als Turm-Munition.
+      const arc = pr.ammo === 'boulder' ? Math.min(9, pr.dist * 0.3) : Math.min(6, pr.dist * 0.22);
       // Glutschweif: drei Punkte entlang der Bahn, der vorderste ist die Spitze
       for (let k = 2; k >= 0; k--) {
         const tk = Math.max(0, t - k * 0.025);
@@ -678,9 +728,10 @@ export class Renderer {
         const ky = pr.y0 + (pr.y1 - pr.y0) * tk - Math.sin(Math.PI * tk) * arc;
         if (pr.ammo === 'fire') ctx.fillStyle = k ? `rgba(255, 140, 60, ${0.5 - k * 0.18})` : '#ffcf6e';
         else if (pr.ammo === 'arrow') ctx.fillStyle = k ? `rgba(230, 216, 168, ${0.42 - k * 0.14})` : '#efe6c4';
+        else if (pr.ammo === 'boulder') ctx.fillStyle = k ? `rgba(120, 105, 85, ${0.5 - k * 0.18})` : '#9c8b6a';
         else ctx.fillStyle = k ? `rgba(190, 182, 168, ${0.42 - k * 0.14})` : '#cfc8ba';
         ctx.beginPath();
-        ctx.arc(kx, ky, (pr.ammo === 'stone' ? 0.85 : 0.6) * (1 - k * 0.28), 0, Math.PI * 2);
+        ctx.arc(kx, ky, (pr.ammo === 'boulder' ? 1.15 : pr.ammo === 'stone' ? 0.85 : 0.6) * (1 - k * 0.28), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1056,6 +1107,20 @@ export class Renderer {
           ctx.fillRect(x - 2.45, y - 0.5, 1.1, 2.6);
           ctx.fillRect(x - 0.65, y - 2.2, 1.3, 4.3);
           ctx.fillRect(x + 1.35, y - 1.2, 1.1, 3.3);
+          // First-Linien: duennere dunkle Dachkante auf jedem Haus
+          ctx.fillStyle = 'rgba(8, 14, 24, 0.65)';
+          ctx.fillRect(x - 2.9, y - 1, 2, 0.3);
+          ctx.fillRect(x - 1.1, y - 2.7, 2.2, 0.3);
+          ctx.fillRect(x + 0.9, y - 1.7, 2, 0.3);
+          // Fensterpunkte in den farbigen Fassaden (dezent dunkel)
+          ctx.fillStyle = 'rgba(8, 14, 24, 0.5)';
+          ctx.fillRect(x - 2.12, y + 0.2, 0.34, 0.4);
+          ctx.fillRect(x - 2.12, y + 1.2, 0.34, 0.4);
+          ctx.fillRect(x - 0.32, y - 1.6, 0.34, 0.4);
+          ctx.fillRect(x - 0.32, y - 0.6, 0.34, 0.4);
+          ctx.fillRect(x - 0.32, y + 0.5, 0.34, 0.4);
+          ctx.fillRect(x + 1.68, y - 0.5, 0.34, 0.4);
+          ctx.fillRect(x + 1.68, y + 0.6, 0.34, 0.4);
         } else if (b.kind === 'fort') {
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
@@ -1150,6 +1215,26 @@ export class Renderer {
         ctx.fillStyle = frac > 0.5 ? '#38b000' : '#e63946';
         ctx.fillRect(x - 3, y - 4.6, 6 * frac, 0.9);
       }
+      // Beschaedigte Gebaeude qualmen: unter 50 % Rest-HP leichter grauer
+      // Rauch, unter 25 % dichterer und dunkler (Phase aus der Zellennummer,
+      // damit nicht alle synchron puffen).
+      let dmgFrac = 1;
+      if (b.kind === 'fort' && b.hp !== undefined) dmgFrac = Math.max(0, b.hp / FORT_HP);
+      else if (b.kind !== 'fort' && b.dmg) dmgFrac = Math.max(0, 1 - b.dmg / TOWER_BUILDING_HP);
+      if (this.animations && dmgFrac < 0.5) {
+        const heavy = dmgFrac < 0.25;
+        const puffs = heavy ? 3 : 2;
+        const base2 = (now / (heavy ? 1100 : 1500) + (b.cell * 0.61803) % 1) % 1;
+        for (let k = 0; k < puffs; k++) {
+          const t = (base2 + k / puffs) % 1;
+          ctx.globalAlpha = (1 - t) * (heavy ? 0.55 : 0.35);
+          ctx.fillStyle = heavy ? '#6b675f' : '#9d988c';
+          ctx.beginPath();
+          ctx.arc(x + t * 0.6 - 0.3, y - 1.5 - t * 3.2, 0.45 + t * (heavy ? 1.1 : 0.8), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
       // Eigener fertiger Turm: schussbereit = pulsierender goldener Punkt
       // ("kann angreifen"), sonst goldener Ladebogen fuer das Nachladen.
       if (b.kind === 'tower' && b.owner === this.myIdx && !deploying) {
@@ -1173,6 +1258,26 @@ export class Renderer {
       }
     }
     ctx.globalAlpha = 1;
+
+    // Fabrik-Schornsteine qualmen (nur fertig gebaute): zwei aufsteigende
+    // Woelkchen, Phase aus der Zellennummer, damit die Fabriken versetzt
+    // puffen (Muster wie der Zugdampf unten).
+    if (this.animations) {
+      for (const b of g.buildings) {
+        if (b.kind !== 'factory' || g.underConstruction(b)) continue;
+        const x = cx(b.cell), y = cy(b.cell);
+        const base = (now / 1600 + (b.cell * 0.61803) % 1) % 1;
+        for (let k = 0; k < 2; k++) {
+          const t = (base + k / 2) % 1;
+          ctx.globalAlpha = (1 - t) * 0.45;
+          ctx.fillStyle = '#e8e4da';
+          ctx.beginPath();
+          ctx.arc(x + 1.6 - t * 0.8, y - 3.8 - t * 2.6, 0.5 + t * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
 
     // Züge auf den Schienen: im Standard-Stil das urspruengliche einfache
     // Rechteck, sonst die Dampflok-Sprite (gedreht in Fahrtrichtung, mit
@@ -1232,58 +1337,100 @@ export class Renderer {
       ti++;
     }
 
-    // Handelsschiffe (kleines Segel ueber Rumpf in Spielerfarbe)
+    // Handelsschiffe: Rumpf mit zugespitztem Bug in Fahrtrichtung gedreht,
+    // weisses Segel als Spitze zum Bug hin (traegt die Richtung optisch mit).
+    // Fahrtrichtung aus dem Pfad, wie beim Kielwasser; Stillstand = nach rechts.
     for (const s of g.tradeShips) {
       const c = g.tradeShipCell(s);
       const x = cx(c), y = cy(c);
       // Kielwasser entgegen der Fahrtrichtung (zentrierte Pfad-Differenz)
+      let ang = 0;
       if (s.path.length > 1) {
         const i = Math.min(s.path.length - 1, s.pos | 0);
         const pc = s.path[Math.max(0, i - 1)], nc = s.path[Math.min(s.path.length - 1, i + 1)];
-        wake(x, y, (nc % w) - (pc % w), ((nc / w) | 0) - ((pc / w) | 0));
+        const dx = (nc % w) - (pc % w), dy = ((nc / w) | 0) - ((pc / w) | 0);
+        wake(x, y, dx, dy);
+        if (dx || dy) ang = Math.atan2(dy, dx);
       }
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      // Rumpf in Besitzerfarbe: rechts der Bug, links das gerade Heck
       ctx.fillStyle = g.players[s.owner].color;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x - 1.3, y + 0.3, 2.6, 1, 0.5);
-      else ctx.rect(x - 1.3, y + 0.3, 2.6, 1);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(x, y - 1.7);
-      ctx.lineTo(x + 1.2, y + 0.4);
-      ctx.lineTo(x - 1.2, y + 0.4);
+      ctx.moveTo(1.6, 0);
+      ctx.lineTo(0.6, 0.7);
+      ctx.lineTo(-1.3, 0.55);
+      ctx.lineTo(-1.3, -0.55);
+      ctx.lineTo(0.6, -0.7);
       ctx.closePath();
       ctx.fill();
+      // Segel: weisses Dreieck mit Spitze zum Bug
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(0.9, 0);
+      ctx.lineTo(-0.3, -0.8);
+      ctx.lineTo(-0.3, 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
 
-    // Transportboote (Invasion) – Rumpf mit rundem Bug/Heck
+    // Transportboote (Invasion): weisser Rumpf mit zugespitztem Bug in
+    // Fahrtrichtung, darin ein kleineres Deck in Besitzerfarbe.
     for (const boat of g.boats) {
       const c = boat.path[Math.min(boat.path.length - 1, boat.pos | 0)];
       const x = cx(c), y = cy(c);
+      let ang = 0;
       if (boat.path.length > 1) {
         const i = Math.min(boat.path.length - 1, boat.pos | 0);
         const pc = boat.path[Math.max(0, i - 1)], nc = boat.path[Math.min(boat.path.length - 1, i + 1)];
-        wake(x, y, (nc % w) - (pc % w), ((nc / w) | 0) - ((pc / w) | 0));
+        const dx = (nc % w) - (pc % w), dy = ((nc / w) | 0) - ((pc / w) | 0);
+        wake(x, y, dx, dy);
+        if (dx || dy) ang = Math.atan2(dy, dx);
       }
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x - 1.8, y - 1.2, 3.6, 2.4, 1.2);
-      else ctx.rect(x - 1.8, y - 1.2, 3.6, 2.4);
+      ctx.moveTo(2.1, 0);
+      ctx.lineTo(1.0, 1.0);
+      ctx.lineTo(-1.6, 0.8);
+      ctx.lineTo(-1.9, 0);
+      ctx.lineTo(-1.6, -0.8);
+      ctx.lineTo(1.0, -1.0);
+      ctx.closePath();
       ctx.fill();
       ctx.fillStyle = g.players[boat.owner].color;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x - 1.1, y - 0.6, 2.2, 1.2, 0.6);
-      else ctx.rect(x - 1.1, y - 0.6, 2.2, 1.2);
+      ctx.moveTo(1.3, 0);
+      ctx.lineTo(0.6, 0.55);
+      ctx.lineTo(-1.1, 0.45);
+      ctx.lineTo(-1.3, 0);
+      ctx.lineTo(-1.1, -0.45);
+      ctx.lineTo(0.6, -0.55);
+      ctx.closePath();
       ctx.fill();
+      ctx.restore();
     }
 
-    // Kriegsschiffe (größer, mit Lebensbalken)
+    // Kriegsschiffe (größer, mit Lebensbalken): Rumpf in Fahrtrichtung
+    // gedreht; bei Stillstand behaelt das Schiff seinen letzten Kurs
+    // (this.shipAngles, wird hier periodisch aufgeraeumt).
+    if (this.shipAngles.size > g.warships.length + 20) {
+      const ids = new Set(g.warships.map(ws => ws.id));
+      for (const id of this.shipAngles.keys()) if (!ids.has(id)) this.shipAngles.delete(id);
+    }
     for (const ws of g.warships) {
       const x = cx(ws.cell), y = cy(ws.cell);
+      let ang = this.shipAngles.get(ws.id) || 0;
       // Kielwasser nur, solange das Schiff unterwegs ist (Pfad nicht abgefahren)
       if (ws.pi < ws.path.length) {
         const pc = ws.path[Math.max(0, ws.pi - 1)], nc = ws.path[ws.pi];
-        wake(x, y, (nc % w) - (pc % w), ((nc / w) | 0) - ((pc / w) | 0));
+        const dx = (nc % w) - (pc % w), dy = ((nc / w) | 0) - ((pc / w) | 0);
+        wake(x, y, dx, dy);
+        if (dx || dy) { ang = Math.atan2(dy, dx); this.shipAngles.set(ws.id, ang); }
       }
       // Ausgewaehlte eigene Schiffe: goldener Ring + Linie/Marke zum Wegpunkt
       if (this.selectedWarshipIds.has(ws.id) && ws.owner === this.myIdx) {
@@ -1302,17 +1449,33 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.stroke();
       }
+      // Rumpf gedreht zeichnen: weisser Grundrumpf mit Bug, darin Deck in
+      // Besitzerfarbe
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x - 2.4, y - 1.3, 4.8, 2.6, 1.3);
-      else ctx.rect(x - 2.4, y - 1.3, 4.8, 2.6);
+      ctx.moveTo(2.7, 0);
+      ctx.lineTo(1.5, 1.2);
+      ctx.lineTo(-2.0, 1.0);
+      ctx.lineTo(-2.4, 0);
+      ctx.lineTo(-2.0, -1.0);
+      ctx.lineTo(1.5, -1.2);
+      ctx.closePath();
       ctx.fill();
       ctx.fillStyle = g.players[ws.owner].color;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x - 1.7, y - 0.7, 3.4, 1.4, 0.7);
-      else ctx.rect(x - 1.7, y - 0.7, 3.4, 1.4);
+      ctx.moveTo(1.8, 0);
+      ctx.lineTo(1.0, 0.7);
+      ctx.lineTo(-1.4, 0.6);
+      ctx.lineTo(-1.7, 0);
+      ctx.lineTo(-1.4, -0.6);
+      ctx.lineTo(1.0, -0.7);
+      ctx.closePath();
       ctx.fill();
-      // Lebensbalken darueber: gruen > 50% HP, sonst rot
+      ctx.restore();
+      // Lebensbalken darueber (achsenfest): gruen > 50% HP, sonst rot
       const maxHp = g.warshipMaxHp(ws);
       const frac = Math.max(0, (maxHp - ws.dmg) / maxHp);
       ctx.fillStyle = '#222';
@@ -1360,12 +1523,22 @@ export class Renderer {
       ctx.beginPath();
       ctx.moveTo(x - 1.4, y + 1.1); ctx.lineTo(x, y - 1.5); ctx.lineTo(x + 1.4, y + 1.1);
       ctx.closePath(); ctx.fill();
-      // Wurfarm (schräger Strich) + Schleuderkelle
+      // Wurfarm + Schleuderkelle. Nach einem Schuss schwingt der Arm kurz
+      // hoch und faellt weich zurueck (Rueckschwung; Startzeit kommt aus
+      // drawProjectiles, wo der Felsbrocken gestartet wird).
+      let armS = 0; // 0 = Ruhelage, 1 = hochgerissen
+      const kick = this.catapultArmAnim.get(cp.id);
+      if (kick !== undefined) {
+        const kt = (now - kick) / 380;
+        if (kt >= 1) this.catapultArmAnim.delete(cp.id);
+        else armS = Math.sin(Math.PI * Math.min(1, kt * 1.6)); // schnell hoch, weich zurueck
+      }
+      const tipX = x + 1.6 - 1.5 * armS, tipY = y - 2.6 - 1.0 * armS;
       ctx.strokeStyle = '#2b2016';
       ctx.lineWidth = 0.7;
-      ctx.beginPath(); ctx.moveTo(x - 0.6, y - 0.2); ctx.lineTo(x + 1.6, y - 2.6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - 0.6, y - 0.2); ctx.lineTo(tipX, tipY); ctx.stroke();
       ctx.fillStyle = '#2b2016';
-      ctx.beginPath(); ctx.arc(x + 1.7, y - 2.7, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tipX + 0.1, tipY - 0.1, 0.7, 0, Math.PI * 2); ctx.fill();
     }
   }
 }
