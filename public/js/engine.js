@@ -136,16 +136,20 @@ const CATAPULT_SEEK_R2 = 1600;       // sucht selbständig Festungen im Radius 4
 //    Brand statt Gebäude zu beschädigen: betroffene gegnerische Zellen
 //    werden neutral und hinterlassen ein Trümmerfeld (siehe ruinMult) –
 //    die Rückeroberung kostet dort RUIN_COST-mal so viele Truppen.
-export const TOWER_RANGE = 14;       // Schussweite des Turms
-const TOWER_RANGE2 = TOWER_RANGE * TOWER_RANGE;
+// Türme haben keine Reichweitenbegrenzung mehr (global), siehe 'tower_shoot'
+// unten – der Ausgleich dafuer ist die lange Nachladezeit (TOWER_AMMO.reload).
 export const TOWER_BUILDING_HP = 2;         // Nicht-Festungsgebäude: Treffer bis zur Zerstörung
-// troopDmg: Truppenschaden pro getroffener gegnerischer Zelle im Radius –
-// dadurch tut ein Schuss auch dann etwas sichtbares, wenn dort kein Gebaeude
-// steht (vorher: Stein/Pfeil richteten auf leerem Gegnerland gar nichts an).
+// troopDmg: Truppenschaden pro Schuss auf gegnerisches Gebiet (einmalig,
+// nicht pro getroffener Zelle) – dadurch tut ein Schuss auch dann etwas
+// sichtbares, wenn dort kein Gebaeude steht (vorher: Stein/Pfeil richteten
+// auf leerem Gegnerland gar nichts an).
+// reload in Ticks (10 Ticks/Sekunde, siehe TURN_MS): ~40s je Schuss – als
+// Ausgleich dafuer, dass die Reichweite global ist (kein TOWER_RANGE-Limit
+// mehr, siehe 'tower_shoot' unten).
 export const TOWER_AMMO = {
-  stone: { cost: 15, radius: 2, reload: 10, troopDmg: 3 },
-  arrow: { cost: 40, radius: 4, reload: 20, troopDmg: 6 },
-  fire:  { cost: 90, radius: 3, reload: 40, troopDmg: 0 },
+  stone: { cost: 15, radius: 2, reload: 400, troopDmg: 3 },
+  arrow: { cost: 40, radius: 4, reload: 400, troopDmg: 6 },
+  fire:  { cost: 90, radius: 3, reload: 400, troopDmg: 0 },
 };
 
 // Boote
@@ -615,7 +619,8 @@ export class Game {
         if (!cfg) return;
         const target = it.target | 0;
         if (target < 0 || target >= this.map.terrain.length) return;
-        if (this.dist2(c, target) > TOWER_RANGE2) return;
+        // Keine Reichweitenbegrenzung mehr: der Turm kann jede Landzelle der
+        // Karte treffen (Ausgleich: lange Nachladezeit, siehe TOWER_AMMO).
         if (p.money < cfg.cost) return;
         p.money -= cfg.cost;
         b.cd = cfg.reload;

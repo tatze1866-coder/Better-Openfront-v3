@@ -267,17 +267,18 @@
         <button id="btnTower">🗼 Turm</button>
       </div>
       <div class="hint">Klick = Angriff · andere Insel = Boot · Rechtsklick = Menü (Bauen, Kriegsschiff, Allianz)</div>
-    </div>
-    <!-- Turm-Kontrollfeld: sobald man einen fertigen eigenen Turm besitzt,
-         schwebt dieses Feld dauerhaft über allem anderen (rechts oben) und
-         zeigt die Munitionspreise. Turm auf der Karte anklicken zum Anlegen,
-         dann Ziel in Reichweite anklicken zum Feuern. -->
-    <div id="towerPanel" class="hidden">
-      <div id="towerPanelLabel">🗼 Turm: Munition wählen</div>
-      <button id="btnAmmoStone" class="ammo-btn">🪨 Stein <span class="ammo-price">15€</span></button>
-      <button id="btnAmmoArrow" class="ammo-btn">🏹 Pfeil <span class="ammo-price">40€</span></button>
-      <button id="btnAmmoFire" class="ammo-btn">🔥 Feuerpfeil <span class="ammo-price">90€</span></button>
-      <button id="btnAmmoCancel">✕</button>
+      <!-- Turm-Kontrollfeld: sobald man einen fertigen eigenen Turm besitzt,
+           schwebt dieses Feld dauerhaft über allem anderen, direkt über der
+           Build-Leiste (unten mittig), und zeigt die Munitionspreise. Turm
+           auf der Karte anklicken zum Anlegen, dann Ziel anklicken zum
+           Feuern (Reichweite ist global). -->
+      <div id="towerPanel" class="hidden">
+        <div id="towerPanelLabel">🗼 Turm: Munition wählen</div>
+        <button id="btnAmmoStone" class="ammo-btn">🪨 Stein <span class="ammo-price">15€</span></button>
+        <button id="btnAmmoArrow" class="ammo-btn">🏹 Pfeil <span class="ammo-price">40€</span></button>
+        <button id="btnAmmoFire" class="ammo-btn">🔥 Feuerpfeil <span class="ammo-price">90€</span></button>
+        <button id="btnAmmoCancel">✕</button>
+      </div>
     </div>
     <div id="toast" class="hidden"></div>
     <!-- Ereignis-Feed unten links: Eliminierungen, Angriffe auf dich, Verrat -->

@@ -14,14 +14,18 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versione
   Radius), unabhängig davon, ob dort ein Gebäude steht.
 
 ### Geändert
-- Das Turm-Kontrollfeld ist jetzt ein permanent schwebendes Panel (rechts
-  oben, über allem anderen), das erscheint, sobald man einen fertig gebauten
-  Turm besitzt – statt nur, solange ein Turm ausgewählt ist. Es zeigt jetzt
-  auch die Munitionspreise direkt an den Buttons an.
+- **Turm-Reichweite ist jetzt global** (vorher 14 Zellen) – jede Landzelle
+  der Karte ist ein gültiges Ziel. Ausgleich: die Nachladezeit wurde auf
+  ca. 40 Sekunden je Schuss angehoben (vorher 1–4 s je nach Munition).
+- Das Turm-Kontrollfeld ist jetzt ein permanent schwebendes Panel unten
+  mittig (direkt über der Bau-Leiste, über allem anderen), das erscheint,
+  sobald man einen fertig gebauten Turm besitzt – statt nur, solange ein
+  Turm ausgewählt ist. Es zeigt jetzt auch die Munitionspreise direkt an
+  den Buttons an.
 
 ### Hinzugefügt
 - **Neues Gebäude: Turm** 🗼 – stationäres Verteidigungs-/Angriffsgebäude
-  (350 €, Reichweite 14 Zellen, wie eine Festung auf eigenem Gebiet baubar).
+  (350 €, globale Reichweite, wie eine Festung auf eigenem Gebiet baubar).
   Anklicken wählt den Turm aus, dann Munition wählen und eine Zielzelle in
   Reichweite anklicken, um zu feuern:
   - 🪨 **Stein** – billig (15 €), kleiner Aufschlagsradius, beschädigt nur
@@ -32,8 +36,8 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versione
     neutral und hinterlassen ein Trümmerfeld – die Rückeroberung kostet dort
     doppelt so viele Truppen (nutzt dieselbe Ruinen-Mechanik wie zerstörte
     Festungen). Eigenes/verbündetes Land bleibt verschont.
-  Jede Munitionsart hat ihre eigene Nachladezeit; der Turm zeigt seine
-  Reichweite und die Aufschlagsfläche der gewählten Munition am Cursor.
+  Jede Munitionsart hat ihre eigene Nachladezeit; der Turm zeigt die
+  Aufschlagsfläche der gewählten Munition am Cursor.
 
 ## [0.17.0] – 2026-07-17
 

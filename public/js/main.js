@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK, TOWER_AMMO, TOWER_RANGE } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK, TOWER_AMMO } from './engine.js';
 import { Renderer } from './renderer.js';
 import { getLang, setLang, applyStaticTranslations, onLangChange, t } from './i18n.js';
 import * as Achievements from './achievements.js';
@@ -1764,7 +1764,8 @@ canvas.addEventListener('pointerup', e => {
       clearCatapultSelection(); // Klick ins Wasser: Auswahl aufheben, normal weiter
     }
     // Turm-Steuerung: eigenen Turm anklicken -> Munition wählen (Panel),
-    // dann eine Zielzelle in Reichweite anklicken, um zu feuern.
+    // dann eine beliebige Landzelle anklicken, um zu feuern (Reichweite ist
+    // global, siehe TOWER_AMMO.reload für die dafür lange Nachladezeit).
     const tw = ownTowerAt(cell);
     if (tw) {
       selectTower(tw.cell === selectedTower ? null : tw.cell);
@@ -1772,7 +1773,9 @@ canvas.addEventListener('pointerup', e => {
       return;
     }
     if (selectedTower !== null) {
-      if (cell >= 0 && game.map.terrain[cell] === 1 && game.dist2(selectedTower, cell) <= TOWER_RANGE * TOWER_RANGE) {
+      // Keine Reichweitenbegrenzung mehr: jede Landzelle der Karte ist ein
+      // gültiges Ziel, dafür lädt der Turm ~40s nach (siehe TOWER_AMMO.reload).
+      if (cell >= 0 && game.map.terrain[cell] === 1) {
         const cfg = TOWER_AMMO[towerAmmo];
         const meP = game.players[myIdx];
         if (!meP || meP.money < cfg.cost) {

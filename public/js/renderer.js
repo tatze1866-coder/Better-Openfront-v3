@@ -6,7 +6,7 @@
 // EIN Bild hochskaliert. So muss pro Frame nicht jede Zelle einzeln gezeichnet
 // werden; geaendert wird nur, was sich wirklich veraendert hat (markDirty).
 
-import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS, FORT_RADIUS, CATAPULT_RANGE, FORT_HP, TOWER_RANGE, TOWER_AMMO, TOWER_BUILDING_HP } from './engine.js';
+import { FACTORY_RADIUS, BUILD_DEPLOY_TICKS, FORT_RADIUS, CATAPULT_RANGE, FORT_HP, TOWER_AMMO, TOWER_BUILDING_HP } from './engine.js';
 import { hash2 } from './rng.js';
 
 // Basisfarben fuer Wasser und neutrales (herrenloses) Land, als [R,G,B].
@@ -618,26 +618,20 @@ export class Renderer {
     }
 
     // Turm im Zielmodus (main.js setzt this.towerAim = { cell, ammo }, wenn
-    // ein eigener Turm zum Schuss ausgewaehlt ist): Reichweitenring in Gold
-    // um den Turm, plus Aufschlagsradius der gewaehlten Munition am Cursor.
+    // ein eigener Turm zum Schuss ausgewaehlt ist): Reichweite ist global
+    // (kein Ring mehr noetig) – nur der Aufschlagsradius der gewaehlten
+    // Munition wird am Cursor eingeblendet.
     if (this.towerAim) {
-      const { cell: tc, ammo } = this.towerAim;
-      ctx.save();
-      ctx.setLineDash([2.5, 2.5]);
-      ctx.lineWidth = 0.9;
-      ctx.strokeStyle = 'rgba(255, 214, 10, 0.85)';
-      ctx.beginPath();
-      ctx.arc(cx(tc), cy(tc), TOWER_RANGE, 0, Math.PI * 2);
-      ctx.stroke();
+      const { ammo } = this.towerAim;
       if (this.hoverCell >= 0) {
         const cfg = TOWER_AMMO[ammo] || TOWER_AMMO.stone;
-        ctx.setLineDash([]);
+        ctx.save();
         ctx.fillStyle = ammo === 'fire' ? 'rgba(230, 57, 70, 0.28)' : 'rgba(255, 214, 10, 0.22)';
         ctx.beginPath();
         ctx.arc(cx(this.hoverCell), cy(this.hoverCell), cfg.radius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       }
-      ctx.restore();
     }
 
     // Trümmerfelder zerstörter Festungen: dunkler Schutt-Haufen

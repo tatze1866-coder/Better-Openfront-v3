@@ -1,5 +1,5 @@
 // Headless-Test der Spiel-Engine (Boote, Gebäude, Allianzen, Determinismus)
-import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, TOWER_AMMO, TOWER_RANGE } from '../public/js/engine.js';
+import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, TOWER_AMMO } from '../public/js/engine.js';
 
 const results = [];
 const ok = (name, cond, extra = '') => {
@@ -1079,22 +1079,13 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     Math.abs((5000 - BUILD_COSTS.tower) - gt.players[0].money) < 5);
   for (let i = 0; i < 55; i++) gt.turn([]);
 
-  // Landfeld in Schussreichweite dem Gegner zuweisen (unabhängig von der
-  // zufälligen Spawn-Distanz auf dieser Karte)
-  const w = gt.map.w, h = gt.map.h;
-  const mx = myCell % w, my = (myCell / w) | 0;
+  // Irgendein Landfeld eines anderen Spielers als Ziel – die Reichweite ist
+  // global, es muss also NICHT mehr in der Nähe des Turms liegen.
   let enemyCell = -1;
-  for (let dy = -TOWER_RANGE; dy <= TOWER_RANGE && enemyCell < 0; dy++) {
-    for (let dx = -TOWER_RANGE; dx <= TOWER_RANGE && enemyCell < 0; dx++) {
-      const x = mx + dx, y = my + dy;
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
-      const c = y * w + x;
-      if (c === myCell || gt.map.terrain[c] !== 1) continue;
-      if (dx * dx + dy * dy > TOWER_RANGE * TOWER_RANGE) continue;
-      enemyCell = c;
-    }
+  for (let c = 0; c < gt.owner.length; c++) {
+    if (c !== myCell && gt.map.terrain[c] === 1) { enemyCell = c; break; }
   }
-  ok('Landfeld in Turm-Reichweite gefunden', enemyCell >= 0);
+  ok('Landfeld für Turm-Ziel gefunden', enemyCell >= 0);
   gt.setOwner(enemyCell, 1);
 
   gt.turn([{ p: 1, type: 'build', kind: 'fort', cell: enemyCell }]);
@@ -1108,12 +1099,14 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   // durch das gleichzeitige Truppenwachstum (economy()) verfälscht wird.
   const troopsBefore = gt.players[1].troops;
   gt.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: enemyCell });
-  ok('Stein beschädigt die Festung', tfort.hp === hpBefore - 1, `hp ${hpBefore} -> ${tfort.hp}`);
+  ok('Stein trifft auch ein weit entferntes Ziel (globale Reichweite)',
+    tfort.hp === hpBefore - 1, `hp ${hpBefore} -> ${tfort.hp}`);
   ok('Stein-Schuss kostet ' + TOWER_AMMO.stone.cost + ' €',
     Math.abs((moneyBefore - TOWER_AMMO.stone.cost) - gt.players[0].money) < 1);
   ok('Stein-Schuss kostet den Gegner auch Truppen (nicht nur das Gebäude)',
     gt.players[1].troops === troopsBefore - TOWER_AMMO.stone.troopDmg);
-  ok('Turm hat jetzt Cooldown', gt.buildingAt.get(myCell).cd > 0);
+  ok('Turm hat jetzt ~40s Cooldown', gt.buildingAt.get(myCell).cd === TOWER_AMMO.stone.reload,
+    'cd=' + gt.buildingAt.get(myCell).cd);
 
   // Zweiter Schuss während des Cooldowns wird ignoriert (cd zaehlt nur
   // weiter herunter, springt nicht auf den vollen Reload-Wert zurueck)
@@ -1124,37 +1117,34 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   // Stein/Pfeil auf leeres Gegnerland ohne Gebäude: vorher passierte hier
   // gar nichts (der eigentlich gemeldete Bug "Turm schießt nicht"), jetzt
   // kostet der Treffer trotzdem Truppen.
-  for (let i = 0; i < 10; i++) gt.turn([]);
   let emptyEnemyCell = -1;
   for (let c = 0; c < gt.owner.length; c++) {
-    if (c !== enemyCell && gt.map.terrain[c] === 1 && !gt.buildingAt.has(c) &&
-        gt.dist2(myCell, c) <= TOWER_RANGE * TOWER_RANGE) { emptyEnemyCell = c; break; }
+    if (c !== enemyCell && gt.map.terrain[c] === 1 && !gt.buildingAt.has(c)) { emptyEnemyCell = c; break; }
   }
   gt.setOwner(emptyEnemyCell, 1);
-  // Turm-Cooldown zurücksetzen, damit der Schuss nicht ignoriert wird
-  gt.buildingAt.get(myCell).cd = 0;
+  gt.buildingAt.get(myCell).cd = 0; // Cooldown für den Test überspringen
   const troopsBefore2 = gt.players[1].troops;
   gt.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'arrow', target: emptyEnemyCell });
   ok('Pfeil trifft auch leeres Gegnerland (ohne Gebäude)',
     gt.players[1].troops === troopsBefore2 - TOWER_AMMO.arrow.troopDmg);
 
-  // Cooldown abwarten, dann Feuerpfeil auf ein zweites Gegnerfeld
-  for (let i = 0; i < 45; i++) gt.turn([]);
+  // Feuerpfeil auf ein drittes, ebenfalls beliebig weit entferntes Gegnerfeld
   let fireCell = -1;
   for (let c = 0; c < gt.owner.length; c++) {
-    if (c !== enemyCell && gt.map.terrain[c] === 1 && gt.dist2(myCell, c) <= TOWER_RANGE * TOWER_RANGE) { fireCell = c; break; }
+    if (c !== enemyCell && c !== emptyEnemyCell && gt.map.terrain[c] === 1) { fireCell = c; break; }
   }
   gt.setOwner(fireCell, 1);
-  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: fireCell }]);
+  gt.buildingAt.get(myCell).cd = 0;
+  gt.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: fireCell });
   ok('Feuerpfeil macht gegnerisches Land neutral', gt.owner[fireCell] === -1);
   ok('Feuerpfeil hinterlässt ein Trümmerfeld (Ruine)', gt.ruins.some(r => r.cell === fireCell));
   ok('Trümmerfeld verdoppelt die Rückeroberungskosten', gt.ruinMult(fireCell) === 2,
     'ruinMult=' + gt.ruinMult(fireCell));
 
   // Eigenes Land bleibt beim Feuerpfeil verschont
-  for (let i = 0; i < 45; i++) gt.turn([]);
+  gt.buildingAt.get(myCell).cd = 0;
   const ownBefore = gt.owner[myCell];
-  gt.turn([{ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: myCell }]);
+  gt.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: myCell });
   ok('Feuerpfeil verschont eigenes Land', gt.owner[myCell] === ownBefore);
 }
 
