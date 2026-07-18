@@ -5,6 +5,8 @@ Startpunkt wählen, Truppen wachsen lassen, Gebiete erobern und die Karte domini
 
 Alle Änderungen und Versionen: siehe [CHANGELOG.md](CHANGELOG.md).
 
+try : https://better-openfront-v3.onrender.com
+
 ## Features
 
 - **Einzelspieler** gegen 1–15 Bots (läuft komplett lokal im Browser)
