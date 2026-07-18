@@ -285,7 +285,6 @@ function openProfile() {
   updateBuildingStyleSeg();
   $('profileNameInput').value = $('nameInput').value;
   updateAchievementsPanel();
-  updateStatsPanel();
   $('profileOverlay').classList.remove('hidden');
 }
 function closeProfile() {
@@ -369,7 +368,6 @@ $('profileOverlay').querySelectorAll('.profile-nav-btn').forEach(btn => {
       p.classList.toggle('hidden', p.dataset.panel !== panel);
     });
     if (panel === 'achievements') updateAchievementsPanel();
-    else if (panel === 'stats') updateStatsPanel();
   });
 });
 
@@ -380,11 +378,6 @@ function updateAchievementsPanel() {
     n: Achievements.unlockedTierCount(),
     total: Achievements.totalTierCount(),
   });
-}
-
-// Statistiken-Panel (Siege/Niederlagen/Winrate + gebaute Gebäude usw.) neu aufbauen
-function updateStatsPanel() {
-  Achievements.renderStats($('statsPanelContent'));
 }
 
 // Neue Erfolgsstufe freigeschaltet -> kurzer Toast (unabhängig davon, ob das
