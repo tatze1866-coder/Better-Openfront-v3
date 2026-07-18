@@ -112,6 +112,9 @@ const WARSHIP_CHASE_R2 = 625;        // jagt Handelsschiffe im Radius 25
 const CONVERT_DIST2 = 4;             // Berührung: Handelsschiff kapern
 const REPAIR_DIST2 = 9;              // Reparatur nahe eigenem Hafen
 const REPAIR_INTERVAL = 20;          // 1 Schaden je 2s
+const WARSHIP_THREAT_R2 = 64;        // Bedrohungsreichweite 8 Zellen (feindliches Kriegsschiff)
+const WARSHIP_RETREAT_DMG = 0.6;     // Taktischer Rueckzug ab 60 % Schaden (Rest-HP <= 40 %)
+const WARSHIP_HUNT_SPEED = 2;        // Jagd-Tempo: Zellen/Tick auf Handelsschiff-Jagd
 
 // Fabriken & Züge
 export const FACTORY_RADIUS = 60;    // Schienennetz-Radius einer Fabrik in Zellen
@@ -558,7 +561,7 @@ export class Game {
         for (let i = 0; i < k; i++) if (this.map.terrain[nb[i]] === 0) { spawn = nb[i]; break; }
         if (spawn < 0) return;
         p.money -= WARSHIP_COST;
-        this.warships.push({ id: this.warshipSeq++, owner: p.idx, home: c, cell: spawn, path: [], pi: 0, dmg: 0, born: this.turnNo, cd: WARSHIP_SHOT_CD, order: -1 });
+        this.warships.push({ id: this.warshipSeq++, owner: p.idx, home: c, cell: spawn, path: [], pi: 0, dmg: 0, born: this.turnNo, cd: WARSHIP_SHOT_CD, order: -1, hunting: false, repairing: false });
         break;
       }
       // Einem eigenen Kriegsschiff einen Wegpunkt (Wasserzelle) zuweisen.
@@ -1096,24 +1099,39 @@ export class Game {
     return WARSHIP_BASE_HP + Math.min(WARSHIP_BONUS_HP, ((this.turnNo - w.born) / WARSHIP_HP_GROW) | 0);
   }
 
-  // Neues Ziel/Route fuer ein Kriegsschiff festlegen. Prioritaet: schwer
-  // beschaedigt -> Reparaturhafen; sonst Spieler-Wegpunkt (order); sonst nahes
-  // feindliches Handelsschiff jagen; sonst um den Heimathafen patrouillieren.
+  // Kursziel Reparaturhafen: naechster eigener/verbuendeter Hafen als
+  // Praedikat auf dessen anliegende Wasserzellen (null, wenn es keinen
+  // passenden Hafen gibt). Wird von Fast-tot-Rueckzug und taktischem
+  // Rueckzug gemeinsam genutzt.
+  repairGoal(w) {
+    let best = -1, bestD = Infinity;
+    for (const b of this.buildings) {
+      if (b.kind !== 'port') continue;
+      if (b.owner !== w.owner && !this.isAllied(b.owner, w.owner)) continue;
+      const d = this.dist2(b.cell, w.cell);
+      if (d < bestD) { bestD = d; best = b.cell; }
+    }
+    if (best < 0) return null;
+    const targets = new Set(this.waterAdjacent(best));
+    return targets.size ? c => targets.has(c) : null;
+  }
+
+  // Neues Ziel/Route fuer ein Kriegsschiff festlegen. Prioritaet: Reparatur-
+  // Modus (klebrig, s.u.) -> Reparaturhafen; sonst Spieler-Wegpunkt (order);
+  // sonst taktischer Rueckzug bei Bedrohung; sonst nahes feindliches
+  // Handelsschiff jagen (mit Jagd-Tempo); sonst um den Heimathafen
+  // patrouillieren. Setzt zugleich w.hunting (Jagd-Flag fuer das Tempo).
+  // Der Reparatur-Modus (w.repairing) wird durch Fast-tot oder taktischen
+  // Rueckzug aktiviert und erst bei dmg === 0 wieder verlassen – sonst
+  // pendelt ein halb repariertes Schiff staendig zwischen Hafen und Einsatz.
   retargetWarship(w, maxHp) {
     let goal = null; // Zielzelle (Wasser) oder Prädikat
-    if (w.dmg >= maxHp - 1) {
-      // Schwer beschädigt: zum nächsten eigenen/verbündeten Hafen zur Reparatur
-      let best = -1, bestD = Infinity;
-      for (const b of this.buildings) {
-        if (b.kind !== 'port') continue;
-        if (b.owner !== w.owner && !this.isAllied(b.owner, w.owner)) continue;
-        const d = this.dist2(b.cell, w.cell);
-        if (d < bestD) { bestD = d; best = b.cell; }
-      }
-      if (best >= 0) {
-        const targets = new Set(this.waterAdjacent(best));
-        if (targets.size) goal = c => targets.has(c);
-      }
+    let hunt = false;
+    if (w.dmg <= 0) w.repairing = false;
+    if (w.dmg >= maxHp - 1) w.repairing = true; // Fast tot -> auslaufen
+    if (w.repairing) {
+      // Reparatur: zum nächsten eigenen/verbündeten Hafen (und dort bleiben)
+      goal = this.repairGoal(w);
     }
     if (!goal && w.order >= 0) {
       // Spieler-Wegpunkt: dorthin fahren; angekommen -> Befehl erledigt
@@ -1124,8 +1142,24 @@ export class Game {
         goal = c => c === target;
       }
     }
+    if (!goal && w.dmg >= maxHp * WARSHIP_RETREAT_DMG) {
+      // Taktischer Rueckzug: stark beschaedigt UND ein feindliches
+      // Kriegsschiff in Bedrohungsreichweite -> absetzen zum Reparaturhafen
+      // (Spieler-Befehle behalten Vorrang, s.o.). Ohne Bedrohung wird
+      // weitergekaempft; die Reparatur laeuft dann nur opportunistisch mit.
+      let threat = false;
+      for (const e of this.warships) {
+        if (e === w || e.dead || e.owner === w.owner || this.isAllied(e.owner, w.owner)) continue;
+        if (!this.players[e.owner].alive) continue;
+        if (this.dist2(e.cell, w.cell) <= WARSHIP_THREAT_R2) { threat = true; break; }
+      }
+      if (threat) {
+        goal = this.repairGoal(w);
+        if (goal) w.repairing = true;
+      }
+    }
     if (!goal) {
-      // Nicht-verbündetes Handelsschiff in der Nähe jagen
+      // Nicht-verbündetes Handelsschiff in der Nähe jagen (mit Jagd-Tempo)
       let prey = null, preyD = Infinity;
       for (const s of this.tradeShips) {
         if (s.owner === w.owner || this.isAllied(s.owner, w.owner)) continue;
@@ -1135,6 +1169,7 @@ export class Game {
       if (prey) {
         const target = this.tradeShipCell(prey);
         goal = c => this.dist2(c, target) <= 2;
+        hunt = true;
       }
     }
     if (!goal) {
@@ -1151,7 +1186,9 @@ export class Game {
     }
     if (goal) {
       const path = this.bfsWater([w.cell], goal);
-      if (path) { w.path = path; w.pi = 0; }
+      // hunting nur bei gefundenem Kurs umschalten: ohne neuen Kurs behaelt
+      // das Schiff seinen alten (und damit sein bisheriges Tempo).
+      if (path) { w.path = path; w.pi = 0; w.hunting = hunt; }
     }
   }
 
@@ -1174,7 +1211,13 @@ export class Game {
       if (w.pi >= w.path.length || this.turnNo % 25 === w.born % 25) {
         this.retargetWarship(w, maxHp);
       }
-      if (w.pi < w.path.length) w.cell = w.path[w.pi++];
+      if (w.pi < w.path.length) {
+        w.cell = w.path[w.pi++];
+        // Jagd-Tempo: auf der Jagd nach einem Handelsschiff legt das
+        // Kriegsschiff WARSHIP_HUNT_SPEED Zellen pro Tick zurueck.
+        for (let s = 1; w.hunting && s < WARSHIP_HUNT_SPEED && w.pi < w.path.length; s++)
+          w.cell = w.path[w.pi++];
+      }
       // Nicht-verbündete Handelsschiffe durch Berührung kapern
       for (const s of this.tradeShips) {
         if (s.owner !== w.owner && !this.isAllied(s.owner, w.owner) &&

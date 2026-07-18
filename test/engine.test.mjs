@@ -1224,6 +1224,119 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
     `Grün ${gFlat.players[0].territory} vs Gebirge ${gRock.players[0].territory} Zellen`);
 }
 
+// ---- Spiel 20: Kriegsschiff-KI – taktischer Rückzug & Jagd-Tempo ----
+{
+  const g = new Game({
+    seed: 4711, mapSize: 'klein', mapType: 'random',
+    players: [{ name: 'A', bot: false }, { name: 'B', bot: false }],
+  });
+  while (g.phase === 'spawn') g.turn([]);
+  const placeBuilding = (owner, kind, cell) => {
+    const b = { owner, kind, cell };
+    g.buildings.push(b);
+    g.buildingAt.set(cell, b);
+    g.players[owner].ports++;
+    return b;
+  };
+  const coastal = g.landCells.filter(c => g.waterAdjacent(c).length > 0);
+  const pA = coastal[0];
+  const pAdj = new Set(g.waterAdjacent(pA));
+  placeBuilding(0, 'port', pA);
+
+  // Wasserzellen: waterStart (20–25 Zellen vom Hafen, mit Wasserweg) und
+  // farWater (> 30 Zellen, ebenfalls erreichbar) fuer Wegpunkt/Heimathafen
+  const n = g.map.terrain.length;
+  let waterStart = -1, farWater = -1;
+  for (let c = 0; c < n && (waterStart < 0 || farWater < 0); c += 13) {
+    if (g.map.terrain[c] !== 0) continue;
+    const d = g.dist2(c, pA);
+    if (waterStart < 0 && d >= 400 && d <= 625 && g.bfsWater([c], q => pAdj.has(q))) waterStart = c;
+    else if (farWater < 0 && d > 900 && g.bfsWater([c], q => pAdj.has(q))) farWater = c;
+  }
+  ok('Testgewässer gefunden (Start & fern)', waterStart >= 0 && farWater >= 0);
+
+  const mkShip = (owner, cell, dmg) => {
+    const s = { id: g.warshipSeq++, owner, home: cell, cell, path: [], pi: 0, dmg, born: g.turnNo, cd: 12, order: -1, hunting: false, repairing: false };
+    g.warships.push(s);
+    return s;
+  };
+  const ws = mkShip(0, waterStart, 3); // 60 % Schaden bei maxHp 5 -> Rueckzug-Schwelle
+  // Feindliches Kriegsschiff in Bedrohungsreichweite (<= 6 Zellen)
+  let foeCell = -1;
+  for (let c = 0; c < n; c += 5) {
+    if (g.map.terrain[c] === 0 && g.dist2(c, waterStart) <= 36) { foeCell = c; break; }
+  }
+  const foe = mkShip(1, foeCell, 0);
+  const dest = () => ws.path[ws.path.length - 1];
+
+  // a) Rückzug greift bei Bedrohung: Kurs auf den Reparaturhafen
+  g.retargetWarship(ws, g.warshipMaxHp(ws));
+  ok('Rückzug bei Bedrohung: Kurs auf den Hafen',
+    ws.path.length > 0 && g.dist2(dest(), pA) <= 2 && ws.hunting === false);
+
+  // b) Ohne Bedrohung kein Rückzug (gleiche Beschädigung)
+  g.warships = g.warships.filter(x => x !== foe);
+  ws.repairing = false; // frischer Zustand: beschaedigt, aber noch nie ausgelaufen
+  g.retargetWarship(ws, g.warshipMaxHp(ws));
+  ok('Ohne Bedrohung kein Hafen-Kurs',
+    ws.path.length > 0 && g.dist2(dest(), pA) > 16,
+    'Ziel-Distanz² ' + (ws.path.length ? g.dist2(dest(), pA) : -1));
+
+  // d) Spieler-Befehl schlägt Rückzug
+  g.warships.push(foe);
+  ws.repairing = false;
+  ws.order = farWater;
+  g.retargetWarship(ws, g.warshipMaxHp(ws));
+  ok('Spieler-Wegpunkt schlägt Rückzug', dest() === farWater && ws.hunting === false);
+
+  // e) Fast-tot-Regel bleibt oberste Priorität (schlägt auch den Wegpunkt)
+  ws.dmg = 4; // maxHp - 1
+  g.retargetWarship(ws, g.warshipMaxHp(ws));
+  ok('Fast tot: Reparatur schlägt Wegpunkt', g.dist2(dest(), pA) <= 2);
+  ws.order = -1;
+
+  // c) Nach voller Reparatur verlässt das Schiff den Hafen wieder
+  g.warships = g.warships.filter(x => x === ws); // nur ws behalten
+  ws.cell = g.waterAdjacent(pA)[0];
+  ws.home = farWater; // Patrouillen-Heimat weit weg -> Abgang ist messbar
+  ws.path = []; ws.pi = 0; ws.dmg = 4; // fast tot am Hafen
+  // Rueckzugs-Entscheidung wie im Spielablauf (Schiff ist ausgelaufen):
+  // setzt den klebrigen Reparatur-Modus, bevor die erste Reparatur tickt
+  g.retargetWarship(ws, g.warshipMaxHp(ws));
+  let healed = false;
+  for (let i = 0; i < 300 && !healed; i++) { g.turn([]); healed = ws.dmg === 0; }
+  ok('Schiff am Hafen vollständig repariert', healed);
+  for (let i = 0; i < 200; i++) g.turn([]);
+  ok('Repariertes Schiff verlässt den Hafen wieder',
+    g.dist2(ws.cell, pA) > 100, 'Distanz² ' + g.dist2(ws.cell, pA));
+
+  // f) Jagd-Tempo: 2 Zellen/Tick auf der Jagd, sonst 1 Zelle/Tick
+  g.turnNo = 1000; // runde Basis: born 999 -> kein 25er-Retarget beim Direktaufruf
+  const hunter = mkShip(0, waterStart, 0); hunter.born = 999;
+  // Beute: festgehaltenes Handelsschiff in Jagdreichweite (10–20 Zellen)
+  let preyCell = -1;
+  for (let c = 0; c < n; c += 7) {
+    if (g.map.terrain[c] !== 0) continue;
+    const d = g.dist2(c, waterStart);
+    if (d >= 100 && d <= 400 && g.bfsWater([waterStart], q => q === c)) { preyCell = c; break; }
+  }
+  ok('Beute-Handelsschiff in Reichweite platziert', preyCell >= 0);
+  g.tradeShips.push({ owner: 1, to: pA, path: new Array(600).fill(preyCell), pos: 0 });
+  g.retargetWarship(hunter, g.warshipMaxHp(hunter));
+  ok('Jagd-Flag gesetzt bei Beute', hunter.hunting === true && hunter.path.length >= 3);
+  const pi0 = hunter.pi;
+  g.processWarships();
+  ok('Jagd-Tempo: 2 Zellen pro Tick', hunter.pi - pi0 === 2, 'Schritte: ' + (hunter.pi - pi0));
+  // Kontrolle: ohne Beute -> kein Jagd-Flag, 1 Zelle/Tick
+  g.tradeShips.length = 0;
+  const walker = mkShip(0, waterStart, 0); walker.born = 999;
+  g.retargetWarship(walker, g.warshipMaxHp(walker));
+  ok('Ohne Beute Patrouille (kein Jagd-Flag)', walker.hunting === false && walker.path.length > 0);
+  const pj0 = walker.pi;
+  g.processWarships();
+  ok('Normaltempo: 1 Zelle pro Tick', walker.pi - pj0 === 1, 'Schritte: ' + (walker.pi - pj0));
+}
+
 console.log(results.join('\n'));
 const fails = results.filter(r => r.startsWith('FAIL')).length;
 console.log(`\n${results.length - fails}/${results.length} Tests bestanden`);

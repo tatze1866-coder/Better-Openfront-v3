@@ -3,6 +3,22 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.23.0] – 2026-07-18
+
+### Hinzugefügt
+- **Taktischer Rückzug für Kriegsschiffe**: Hat ein Kriegsschiff nur noch
+  ≤ 40 % seiner Leben und ist ein feindliches Kriegsschiff in der Nähe
+  (8 Zellen Bedrohungsreichweite), setzt es sich zum nächsten eigenen oder
+  verbündeten Hafen ab, statt bis auf 1 HP zu kämpfen. Spieler-Wegpunkte
+  behalten Vorrang; die bisherige Fast-tot-Regel bleibt oberste Priorität.
+- **Reparatur-Modus für Kriegsschiffe**: Ein zur Reparatur ausgelaufenes
+  Schiff bleibt jetzt am Hafen, bis es vollständig repariert ist, und kehrt
+  erst dann zum Normalverhalten zurück (vorher verließ es den Hafen schon
+  nach dem ersten Reparatur-Tick und pendelte unrepariert zurück).
+- **Jagd-Tempo für Kriegsschiffe**: Auf einem Jagd-Kurs gegen ein feindliches
+  Handelsschiff legt ein Kriegsschiff 2 Zellen pro Tick zurück statt 1
+  (Rückzug, Patrouille und Spieler-Wege bleiben bei 1 Zelle/Tick).
+
 ## [0.22.0] – 2026-07-18
 
 ### Hinzugefügt
