@@ -3,6 +3,19 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.21.1] – 2026-07-18
+
+### Behoben
+- **Kamera-Lag im mittleren Zoom-Band behoben**: Das Gelände-Relief
+  (Berg-Dreiecke, Gipfelstriche, Hügel-Kuppen) wurde bisher pro Zelle mit
+  eigenem Canvas-Pfad gezeichnet – bei mittlerem Zoom sind tausende Zellen
+  sichtbar, was die Kamera spürbar stottern ließ. Jetzt wird jede Gruppe in
+  einen gemeinsamen Pfad gesammelt und einmal gefüllt/gestrichelt; zusätzlich
+  wird die Symbol-Dichte beim Rauszoomen per stabilem Zell-Hash gleichmäßig
+  ausgedünnt (ab Zoomstufe 9 alles wie bisher, bei 4,5 noch ~15 %), statt
+  schlagartig abzuschalten. Auch Wellen-Schimmer und Brandungs-Schaum füllen
+  jetzt in wenigen Alpha-Stufen gebatcht statt Zelle für Zelle.
+
 ## [0.21.0] – 2026-07-18
 
 ### Hinzugefügt

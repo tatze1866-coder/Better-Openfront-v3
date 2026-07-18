@@ -195,6 +195,8 @@ export class Renderer {
     const peaks = new Uint8Array(n);           // helle Felsspitzen-Maske (Gebirge)
     this.mountains = []; // Gebirgszellen (Zoom-Relief: Dreiecke)
     this.hills = [];     // Huegelzellen, ausgeduennt (Zoom-Relief: Kuppen)
+    // Jeder Relief-Eintrag bekommt einen stabilen Hash h in [0,1), mit dem
+    // beim Zeichnen je nach Zoomstufe gleichmaessig ausgeduennt wird.
     for (let c = 0; c < n; c++) {
       const x = c % w, y = (c / w) | 0;
       const patch = hash2(x >> 2, y >> 2, seed);       // 4x4-Flecken (Gelaende-Toene)
@@ -215,9 +217,9 @@ export class Renderer {
         // Gelaende-Relief vorberechnen (statisch, nur einmal noetig)
         if (lt[c] === 2) {
           if (hash2(x, y, seed ^ 0x77) > 0.72) peaks[c] = 1;
-          this.mountains.push({ x, y });
+          this.mountains.push({ x, y, h: hash2(x, y, seed ^ 0x66) });
         } else if (lt[c] === 1 && hash2(x, y, seed ^ 0x51) > 0.55) {
-          this.hills.push({ x, y });
+          this.hills.push({ x, y, h: hash2(x, y, seed ^ 0x66) });
         }
       }
     }
@@ -564,27 +566,46 @@ export class Renderer {
     const vx0 = -this.ox / this.scale - 1, vy0 = -this.oy / this.scale - 1;
     const vx1 = vx0 + this.canvas.width / this.scale + 2;
     const vy1 = vy0 + this.canvas.height / this.scale + 2;
+    // Statt pro Zelle globalAlpha zu wechseln und einzeln zu fuellen:
+    // Alpha auf 1/48-Stufen quantisieren (Fehler <= ~0.01, praktisch
+    // unsichtbar) und alle Zellen einer Stufe in EINEM Pfad fuellen.
+    const buckets = new Map(); // quantisiertes Alpha -> [x0, y0, x1, y1, ...]
+    const push = (a, x, y) => {
+      const q = Math.round(a * 48) / 48;
+      let pts = buckets.get(q);
+      if (!pts) buckets.set(q, pts = []);
+      pts.push(x, y);
+    };
+    const flush = () => {
+      for (const [q, pts] of buckets) {
+        ctx.globalAlpha = q;
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i += 2) ctx.rect(pts[i], pts[i + 1], 1, 1);
+        ctx.fill();
+      }
+      buckets.clear();
+    };
     // Brandung: Schaum-Saum entlang der Kuesten (vor den Lichtpunkten, da
     // er groessere Flaechen abdeckt). Sanftes, phasenversetztes Pulsieren.
     if (this.surf.length) {
       ctx.fillStyle = '#eaf6ff';
       for (const sf of this.surf) {
         if (sf.x < vx0 || sf.x > vx1 || sf.y < vy0 || sf.y > vy1) continue;
-        ctx.globalAlpha = this.animations
+        push(this.animations
           ? 0.05 + 0.15 * (0.5 + 0.5 * Math.sin(now / 900 + sf.phase))
-          : 0.08;
-        ctx.fillRect(sf.x, sf.y, 1, 1);
+          : 0.08, sf.x, sf.y);
       }
+      flush();
     }
     if (!this.sparkles.length) { ctx.globalAlpha = 1; return; }
     ctx.fillStyle = '#dff3ff';
     for (const sp of this.sparkles) {
       if (sp.x < vx0 || sp.x > vx1 || sp.y < vy0 || sp.y > vy1) continue;
-      ctx.globalAlpha = this.animations
+      push(this.animations
         ? 0.08 + 0.3 * (0.5 + 0.5 * Math.sin(now / 750 + sp.phase))
-        : 0.14;
-      ctx.fillRect(sp.x, sp.y, 1, 1);
+        : 0.14, sp.x, sp.y);
     }
+    flush();
     ctx.globalAlpha = 1;
   }
 
@@ -821,38 +842,52 @@ export class Renderer {
     // Gelaende-Relief bei groesseren Zoomstufen: schattierte Dreiecke auf
     // Gebirgszellen, kleine Kuppen auf Huegeln. Aus vorberechneten Listen,
     // nur der sichtbare Ausschnitt; bei weiterem Zoom wirkt es unruhig.
+    // Je Gruppe wird alles in EINEN Pfad gesammelt und einmal gefuellt bzw.
+    // gestrichelt (statt tausender Einzel-Calls pro Frame – sonst spuerbarer
+    // Kamera-Lag im mittleren Zoom-Band). moveTo() vor jedem arc(), damit
+    // die Kuppen nicht durch Verbindungslinien verklebt werden.
+    // Zoom-adaptive Dichte: ab scale 9 alles wie bisher (h ist stets < 1,
+    // also faellt nichts weg), darunter linear ausgeduennt bis ~15 % bei
+    // 4.5 – dort werden die Einzelsymbole ohnehin zu Pixelmatsch.
     if (this.scale >= 4.5) {
       const rx0 = -this.ox / this.scale - 1, ry0 = -this.oy / this.scale - 1;
       const rx1 = rx0 + this.canvas.width / this.scale + 2;
       const ry1 = ry0 + this.canvas.height / this.scale + 2;
+      const dens = Math.min(1, Math.max(0.15, (this.scale - 4.5) / 4.5));
       ctx.fillStyle = 'rgba(56, 48, 38, 0.5)';
+      ctx.beginPath();
       for (const hp of this.hills) {
+        if (hp.h > dens) continue;
         if (hp.x < rx0 || hp.x > rx1 || hp.y < ry0 || hp.y > ry1) continue;
-        ctx.beginPath();
+        ctx.moveTo(hp.x + 0.02, hp.y + 0.55);
         ctx.arc(hp.x + 0.3, hp.y + 0.55, 0.28, Math.PI, 0);
-        ctx.fill();
-        ctx.beginPath();
+        ctx.moveTo(hp.x + 0.52, hp.y + 0.55);
         ctx.arc(hp.x + 0.72, hp.y + 0.55, 0.2, Math.PI, 0);
-        ctx.fill();
       }
+      ctx.fill();
+      ctx.fillStyle = 'rgba(48, 46, 44, 0.62)';
+      ctx.beginPath();
       for (const mp of this.mountains) {
+        if (mp.h > dens) continue;
         if (mp.x < rx0 || mp.x > rx1 || mp.y < ry0 || mp.y > ry1) continue;
-        ctx.fillStyle = 'rgba(48, 46, 44, 0.62)';
-        ctx.beginPath();
         ctx.moveTo(mp.x - 0.02, mp.y + 0.95);
         ctx.lineTo(mp.x + 0.5, mp.y + 0.06);
         ctx.lineTo(mp.x + 1.02, mp.y + 0.95);
         ctx.closePath();
-        ctx.fill();
-        // heller Gipfelstrich
-        ctx.strokeStyle = 'rgba(240, 240, 246, 0.7)';
-        ctx.lineWidth = 0.12;
-        ctx.beginPath();
+      }
+      ctx.fill();
+      // helle Gipfelstriche
+      ctx.strokeStyle = 'rgba(240, 240, 246, 0.7)';
+      ctx.lineWidth = 0.12;
+      ctx.beginPath();
+      for (const mp of this.mountains) {
+        if (mp.h > dens) continue;
+        if (mp.x < rx0 || mp.x > rx1 || mp.y < ry0 || mp.y > ry1) continue;
         ctx.moveTo(mp.x + 0.34, mp.y + 0.38);
         ctx.lineTo(mp.x + 0.5, mp.y + 0.06);
         ctx.lineTo(mp.x + 0.66, mp.y + 0.38);
-        ctx.stroke();
       }
+      ctx.stroke();
     }
 
     // Schienennetz zuerst (unter allem): alle Kanten aus dem Engine-Graph –
