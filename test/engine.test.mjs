@@ -1,5 +1,5 @@
 // Headless-Test der Spiel-Engine (Boote, Gebäude, Allianzen, Determinismus)
-import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, TOWER_AMMO } from '../public/js/engine.js';
+import { Game, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, MAP_SIZES, GROWTH_PEAK, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, TOWER_AMMO, TERRAIN_COST } from '../public/js/engine.js';
 
 const results = [];
 const ok = (name, cond, extra = '') => {
@@ -52,9 +52,14 @@ ok('Bauen zu nah an Gebäude abgelehnt', g.players[0].forts === 0);
 // Geld direkt geben (Einkommen abwarten würde den Spieler den Bots ausliefern)
 g.players[0].money = 500;
 for (let i = 0; i < 500 && g.players[0].troops < 500; i++) g.turn([]);
-let fortCell = -1;
+// Festung weit weg von der Stadt bauen (Abstand > MIN_BUILD_DIST2 der Engine).
+// Seit den Geländetypen expandiert der Spieler langsamer – statt einer harten
+// Distanz 150 nehmen wir die weiteste eigene Zelle jenseits des Mindestabstands.
+let fortCell = -1, fortBestD = 0;
 for (let c = 0; c < g.owner.length; c++) {
-  if (g.owner[c] === 0 && g.dist2(c, myCell) > 150) { fortCell = c; break; }
+  if (g.owner[c] !== 0) continue;
+  const d = g.dist2(c, myCell);
+  if (d > 100 && d > fortBestD) { fortBestD = d; fortCell = c; }
 }
 g.turn([{ p: 0, type: 'build', kind: 'fort', cell: fortCell }]);
 ok('Festung gebaut', g.players[0].forts === 1);
@@ -267,10 +272,11 @@ ok('Team-Sieg: verbündete Überlebende gewinnen gemeinsam',
   // gleich starken Gegnern ist der Pool systembedingt schnell leer, weil die
   // Vorstoß-Kosten mit der Truppendichte des Verteidigers steigen. Getestet wird
   // die Mechanik (beide Angriffe existieren und haben eine Front), nicht wie
-  // lange die Truppen reichen.
+  // lange die Truppen reichen. Hohes ratio, damit der Pool auch den ersten Tick
+  // übersteht – die Geländekosten (Hügel/Gebirge bis 2.5x) erhöhen den Verbrauch.
   gl.turn([
-    { p: 0, type: 'attack', target: 1, ratio: 0.5 },
-    { p: 1, type: 'attack', target: 0, ratio: 0.5 },
+    { p: 0, type: 'attack', target: 1, ratio: 0.9 },
+    { p: 1, type: 'attack', target: 0, ratio: 0.9 },
   ]);
   const a01 = gl.attacks.find(a => a.attacker === 0 && a.target === 1);
   const a10 = gl.attacks.find(a => a.attacker === 1 && a.target === 0);
@@ -1178,6 +1184,44 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Feuerpfeil eliminiert den Spieler ohne Restgebiet', gz.players[1].alive === false);
   ok('Eliminierung landet im Ereignis-Feed',
     gz.feedEvents.some(e => e.t === 'elim' && e.p === 1 && e.by === 0));
+}
+
+// ---- Spiel 19: Geländetypen (Grünfläche/Hügel/Gebirge) ----
+{
+  const gt = newGame(777);
+  // Anteile auf der Karte (adaptiv-Quantile in mapgen: ~55/30/15)
+  const cnt = [0, 0, 0];
+  let mismatch = 0;
+  for (let c = 0; c < gt.map.terrain.length; c++) {
+    if (gt.map.terrain[c] !== 1) continue;
+    const lt = gt.map.landType[c];
+    cnt[lt]++;
+    if (gt.terrainMult(c) !== TERRAIN_COST[lt]) mismatch++;
+  }
+  const total = cnt[0] + cnt[1] + cnt[2];
+  ok('Alle drei Geländetypen auf der Karte', cnt[0] > 0 && cnt[1] > 0 && cnt[2] > 0);
+  ok('Gelände-Anteile ~55/30/15',
+    Math.abs(cnt[0] / total - 0.55) < 0.04 && Math.abs(cnt[1] / total - 0.30) < 0.04 &&
+    Math.abs(cnt[2] / total - 0.15) < 0.04,
+    cnt.map(k => Math.round(100 * k / total) + '%').join('/'));
+  ok('terrainMult spiegelt TERRAIN_COST je Zelle', mismatch === 0);
+
+  // Verhalten: identische Karte, einmal alles Grünfläche, einmal alles
+  // Gebirge – die Expansion muss im Gebirge deutlich langsamer laufen.
+  const gFlat = newGame(5150), gRock = newGame(5150);
+  for (const gg of [gFlat, gRock]) {
+    while (gg.phase === 'spawn') gg.turn([]);
+    // Bots ruhigstellen, damit nur die eigene Expansion zählt
+    gg.clearPlayerCells(1); gg.clearPlayerCells(2);
+    gg.players[1].troops = 0; gg.players[2].troops = 0;
+    gg.turn([{ p: 0, type: 'attack', target: -1, ratio: 0.5 }]);
+  }
+  gFlat.map.landType.fill(0);
+  gRock.map.landType.fill(2);
+  for (let i = 0; i < 60; i++) { gFlat.turn([]); gRock.turn([]); }
+  ok('Gebirge bremst die Expansion deutlich',
+    gFlat.players[0].territory > gRock.players[0].territory * 1.5,
+    `Grün ${gFlat.players[0].territory} vs Gebirge ${gRock.players[0].territory} Zellen`);
 }
 
 console.log(results.join('\n'));

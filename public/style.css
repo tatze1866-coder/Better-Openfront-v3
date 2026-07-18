@@ -343,8 +343,8 @@ body.no-anim button { transition: none; }
 .build-row button.build-active { background: #e76f51; box-shadow: 0 0 0 2px #f4a261; }
 .build-icon { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; border-radius: 50%; }
 
-/* Turm-Kontrollfeld: schwebt permanent über allem anderen (hoher z-index),
-   solange man mind. einen fertigen Turm besitzt – siehe updateTowerPanel().
+/* Turm-Kontrollfeld: schwebt über allem anderen (hoher z-index), aber nur,
+   solange ein eigener Turm zum Zielen ausgewählt ist – siehe updateTowerPanel().
    Unten mittig, direkt über dem Bau-HUD. */
 #towerPanel {
   position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
@@ -364,12 +364,13 @@ body.no-anim button { transition: none; }
 #towerPanelLabel { flex-shrink: 0; color: #cdd8e3; font-weight: 600; white-space: nowrap; }
 .ammo-btn {
   display: flex; align-items: center; justify-content: center; gap: 5px;
+  width: auto; /* globaler button-Style setzt width:100% – das Panel soll kompakt bleiben */
   padding: 6px 8px; font-size: 12px; white-space: nowrap;
 }
 .ammo-btn.ammo-active { background: #e76f51; box-shadow: 0 0 0 2px #f4a261; }
 .ammo-btn .ammo-price { color: #ffd60a; font-weight: 700; }
 .ammo-btn.ammo-active .ammo-price { color: #fff; }
-#btnAmmoCancel { flex: 0 0 auto; padding: 6px 10px; }
+#btnAmmoCancel { flex: 0 0 auto; width: auto; padding: 6px 10px; }
 
 #toast {
   /* Oben mittig, unterhalb des Karten-Hover-Tooltips (top: 64px), damit sich

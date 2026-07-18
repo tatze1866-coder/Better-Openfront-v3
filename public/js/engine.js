@@ -79,6 +79,13 @@ export const FORT_HP = 3;            // Katapult-Treffer bis zur Zerstörung
 // Eroberung im Umkreis kostet RUIN_COST-mal so viele Truppen.
 const RUIN_RADIUS2 = 100;            // Trümmerfeld-Radius 10
 const RUIN_COST = 2;
+// Geländetypen je Landzelle (this.map.landType, in mapgen.js erzeugt):
+// 0 = Grünfläche, 1 = Hügel, 2 = Gebirge. Die Eroberung einer Zelle kostet
+// TERRAIN_COST[typ]-mal so viele Truppen (multiplikativ mit Festung/Ruinen).
+export const TERRAIN_PLAIN = 0;
+export const TERRAIN_HILLS = 1;
+export const TERRAIN_MOUNTAIN = 2;
+export const TERRAIN_COST = [1, 1.5, 2.5];
 const MIN_BUILD_DIST2 = 100;         // Mindestabstand 10 zwischen eigenen Gebäuden
 const PORT_SNAP_RADIUS = 8;          // Hafen-Klick springt bis zu 8 Zellen zur Küste
 export const BUILD_DEPLOY_TICKS = 50; // 5s Aufbauzeit: Gebäude wirken erst danach
@@ -782,6 +789,12 @@ export class Game {
     return 1;
   }
 
+  // Gelände-Malus für eine Zelle: Grünfläche 1x, Hügel 1.5x, Gebirge 2.5x
+  // (TERRAIN_COST). Stapelt sich multiplikativ mit Festung und Ruinen.
+  terrainMult(cell) {
+    return TERRAIN_COST[this.map.landType[cell] || 0];
+  }
+
   // Ein Turmschuss trifft die Zielzelle und ihre Umgebung (Radius nach
   // Munitionsart, siehe TOWER_AMMO). 'stone'/'arrow' beschädigen gegnerische
   // Gebäude im Aufschlag (Trefferpunkte, wie Katapulte gegen Festungen).
@@ -926,7 +939,7 @@ export class Game {
       }
       const defender = o >= 0 ? this.players[o] : null;
       const density = defender ? defender.troops / Math.max(1, defender.territory) : 0;
-      const cost = (defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST) * this.fortBonus(cell, o) * this.ruinMult(cell);
+      const cost = (defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST) * this.fortBonus(cell, o) * this.ruinMult(cell) * this.terrainMult(cell);
       if (boat.troops <= cost) continue; // Landung abgewehrt
       let pool = boat.troops - cost;
       if (defender) {
@@ -1541,7 +1554,7 @@ export class Game {
       const baseCost = defender ? ENEMY_COST_BASE + density * ENEMY_COST_DENSITY : NEUTRAL_COST;
       let captured = 0;
       for (const cell of atk.frontier) {
-        const cellCost = baseCost * this.fortBonus(cell, atk.target) * this.ruinMult(cell);
+        const cellCost = baseCost * this.fortBonus(cell, atk.target) * this.ruinMult(cell) * this.terrainMult(cell);
         if (atk.pool < cellCost) continue; // z.B. Festungszelle zu teuer
         atk.pool -= cellCost;
         if (defender) {

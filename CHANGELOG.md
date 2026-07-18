@@ -3,6 +3,33 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.21.0] – 2026-07-18
+
+### Hinzugefügt
+- **Geländetypen: Grünfläche, Hügel, Gebirge** – jede Landzelle bekommt
+  jetzt einen Typ, prozedural aus fraktalem Rauschen plus Küstenabstand
+  generiert (Küsten flach, im Landesinneren Hügelketten und Gebirgsmassive;
+  bei Welt-/Kontinent-Karten genauso). Die Anteile sind auf jeder Karte
+  gleich (~55 % Grün, ~30 % Hügel, ~15 % Gebirge), weil die Schwellen als
+  Quantile der jeweiligen Karten-Höhenverteilung bestimmt werden.
+- **Gelände kostet Truppen**: Die Eroberung einer Zelle kostet je nach Typ
+  mehr Truppen – Grünfläche 1× (wie bisher), Hügel 1,5×, Gebirge 2,5×.
+  Stapelt sich multiplikativ mit Festungs- und Ruinen-Malus, gilt für
+  Landangriffe und Bootslandungen gleichermaßen.
+- **Gelände-Optik**: Hügelland wird erdig-braun, Gebirge felsgrau mit hellen
+  Felsspitzen eingetönt (auf eigenem/feindlichem Gebiet dezent, damit die
+  Reichsfarben dominant bleiben); beim Reinzoomen erscheinen Berggipfel als
+  schattierte Dreiecke mit hellem Gipfelstrich und Hügel als kleine Kuppen.
+
+## [0.20.1] – 2026-07-18
+
+### Behoben
+- **Turm-Panel nicht mehr bildschirmbreit**: Der globale `button { width: 100% }`-Stil
+  streckte den ✕-Button auf volle Panelbreite (die Munitions-Buttons wurden
+  dafür geschrumpft) – das Feld riss dadurch fast über die ganze Anzeige.
+  Die Panel-Buttons haben jetzt ihre natürliche Breite, das Panel bleibt
+  kompakt.
+
 ## [0.20.0] – 2026-07-18
 
 ### Hinzugefügt

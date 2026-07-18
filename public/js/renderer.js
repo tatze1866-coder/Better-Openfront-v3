@@ -26,6 +26,16 @@ function darken(rgb, f) {
   return [rgb[0] * f | 0, rgb[1] * f | 0, rgb[2] * f | 0];
 }
 
+// Zwei RGB-Farben mischen (t = Anteil von b). Liefert ein neues Array.
+function mixRgb(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+// Gelaende-Toene fuer die Terraintypen (map.landType: 0 Grün, 1 Hügel, 2 Gebirge)
+const HILLS_TINT = [148, 134, 104];   // erdiger Braunton fuer Huegelland
+const MOUNT_TINT = [148, 148, 152];   // Felsgrau fuer Gebirge
+const PEAK_TINT = [238, 238, 244];    // helle Felsspitzen/Schnee im Gebirge
+
 // Hex-Farbe mit Alpha als rgba()-String (z.B. fuer Radius-Ringe).
 function hexA(hex, a) {
   const [r, g, b] = hexToRgb(hex);
@@ -181,6 +191,10 @@ export class Renderer {
     const seed = this.game.seed | 0;
     const sparkles = [];
     const surf = [];   // Uferzellen (depth 1) fuer den Brandungs-Schaum
+    const lt = this.game.map.landType || null; // Gelaendetypen (0 Grün, 1 Hügel, 2 Gebirge)
+    const peaks = new Uint8Array(n);           // helle Felsspitzen-Maske (Gebirge)
+    this.mountains = []; // Gebirgszellen (Zoom-Relief: Dreiecke)
+    this.hills = [];     // Huegelzellen, ausgeduennt (Zoom-Relief: Kuppen)
     for (let c = 0; c < n; c++) {
       const x = c % w, y = (c / w) | 0;
       const patch = hash2(x >> 2, y >> 2, seed);       // 4x4-Flecken (Gelaende-Toene)
@@ -197,11 +211,21 @@ export class Renderer {
           const g3 = hash2(x, y, seed ^ 0x2c1b);
           if (g3 > 0.42) surf.push({ x, y, phase: g3 * 6.28 });
         }
+      } else if (lt) {
+        // Gelaende-Relief vorberechnen (statisch, nur einmal noetig)
+        if (lt[c] === 2) {
+          if (hash2(x, y, seed ^ 0x77) > 0.72) peaks[c] = 1;
+          this.mountains.push({ x, y });
+        } else if (lt[c] === 1 && hash2(x, y, seed ^ 0x51) > 0.55) {
+          this.hills.push({ x, y });
+        }
       }
     }
     this.noise = noise;
     this.sparkles = sparkles;
     this.surf = surf;
+    this.peaks = peaks;
+    this.landTypes = lt;
   }
 
   // Eine Zelle in die Rohpixel (this.img) schreiben (4 Bytes: R,G,B,A).
@@ -258,6 +282,17 @@ export class Renderer {
       } else {
         base = edge ? this.colorsEdge[o] : seam ? this.colorsSeam[o] : this.colorsLight[o];
         amp = 0.09;
+      }
+      // Gelaende-Toenung: Huegel erdig, Gebirge felsgrau mit hellen Spitzen.
+      // Auf Spielerland deutlich schwächer eingemischt, damit die Reichsfarbe
+      // (und damit die Territorien) dominant lesbar bleibt.
+      const lt = this.landTypes ? this.landTypes[c] : 0;
+      if (lt === 1) {
+        base = mixRgb(base, HILLS_TINT, o < 0 ? 0.5 : 0.2);
+      } else if (lt === 2) {
+        base = mixRgb(base, MOUNT_TINT, o < 0 ? 0.62 : 0.32);
+        amp += 0.07; // mehr Struktur im Fels
+        if (this.peaks[c]) base = mixRgb(base, PEAK_TINT, o < 0 ? 0.5 : 0.3);
       }
       // Kuestenschatten auf Spieler-Land (Plastizitaet der Inseln)
       const shore = o >= 0 && coast && !edge ? 0.88 : 1;
@@ -782,6 +817,43 @@ export class Renderer {
         ctx.fill();
       }
     };
+
+    // Gelaende-Relief bei groesseren Zoomstufen: schattierte Dreiecke auf
+    // Gebirgszellen, kleine Kuppen auf Huegeln. Aus vorberechneten Listen,
+    // nur der sichtbare Ausschnitt; bei weiterem Zoom wirkt es unruhig.
+    if (this.scale >= 4.5) {
+      const rx0 = -this.ox / this.scale - 1, ry0 = -this.oy / this.scale - 1;
+      const rx1 = rx0 + this.canvas.width / this.scale + 2;
+      const ry1 = ry0 + this.canvas.height / this.scale + 2;
+      ctx.fillStyle = 'rgba(56, 48, 38, 0.5)';
+      for (const hp of this.hills) {
+        if (hp.x < rx0 || hp.x > rx1 || hp.y < ry0 || hp.y > ry1) continue;
+        ctx.beginPath();
+        ctx.arc(hp.x + 0.3, hp.y + 0.55, 0.28, Math.PI, 0);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(hp.x + 0.72, hp.y + 0.55, 0.2, Math.PI, 0);
+        ctx.fill();
+      }
+      for (const mp of this.mountains) {
+        if (mp.x < rx0 || mp.x > rx1 || mp.y < ry0 || mp.y > ry1) continue;
+        ctx.fillStyle = 'rgba(48, 46, 44, 0.62)';
+        ctx.beginPath();
+        ctx.moveTo(mp.x - 0.02, mp.y + 0.95);
+        ctx.lineTo(mp.x + 0.5, mp.y + 0.06);
+        ctx.lineTo(mp.x + 1.02, mp.y + 0.95);
+        ctx.closePath();
+        ctx.fill();
+        // heller Gipfelstrich
+        ctx.strokeStyle = 'rgba(240, 240, 246, 0.7)';
+        ctx.lineWidth = 0.12;
+        ctx.beginPath();
+        ctx.moveTo(mp.x + 0.34, mp.y + 0.38);
+        ctx.lineTo(mp.x + 0.5, mp.y + 0.06);
+        ctx.lineTo(mp.x + 0.66, mp.y + 0.38);
+        ctx.stroke();
+      }
+    }
 
     // Schienennetz zuerst (unter allem): alle Kanten aus dem Engine-Graph –
     // Fabrik–Station UND Stadt–Stadt (siehe buildRailNetwork). Alles in einem

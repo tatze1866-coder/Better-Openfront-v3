@@ -208,8 +208,64 @@ function generatePresetTerrain(seed, w, h, view) {
   return terrain;
 }
 
+// ---------- Geländetypen (Grünfläche / Hügel / Gebirge) ----------
+// Jede Landzelle bekommt einen Typ: 0 = Grünfläche, 1 = Hügel, 2 = Gebirge.
+// Grundlage ist fraktales Rauschen (grosse glatte Flecken ergeben zusammen-
+// haengende Bergregionen statt Zufallsstreusel), kombiniert mit dem Abstand
+// zur Küste: am Wasser bleibt es flach, im Landesinneren steigt das Gelände
+// an. Wie alles hier vollständig deterministisch aus dem Seed abgeleitet.
+function computeLandTypes(terrain, w, h, seed) {
+  const n = w * h;
+  // Küstenabstand je Landzelle (BFS-Ringe vom Wasser aus, gedeckelt bei 12)
+  const dist = new Uint8Array(n);
+  const queue = [];
+  for (let c = 0; c < n; c++) {
+    if (terrain[c] !== 1) continue;
+    const x = c % w, y = (c / w) | 0;
+    if ((x > 0 && terrain[c - 1] === 0) || (x < w - 1 && terrain[c + 1] === 0) ||
+        (y > 0 && terrain[c - w] === 0) || (y < h - 1 && terrain[c + w] === 0)) {
+      dist[c] = 1;
+      queue.push(c);
+    }
+  }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const c = queue[qi];
+    const d = dist[c];
+    if (d >= 12) continue;
+    const x = c % w, y = (c / w) | 0;
+    if (x > 0 && terrain[c - 1] === 1 && !dist[c - 1]) { dist[c - 1] = d + 1; queue.push(c - 1); }
+    if (x < w - 1 && terrain[c + 1] === 1 && !dist[c + 1]) { dist[c + 1] = d + 1; queue.push(c + 1); }
+    if (y > 0 && terrain[c - w] === 1 && !dist[c - w]) { dist[c - w] = d + 1; queue.push(c - w); }
+    if (y < h - 1 && terrain[c + w] === 1 && !dist[c + w]) { dist[c + w] = d + 1; queue.push(c + w); }
+  }
+  const landType = new Uint8Array(n);
+  // Höhenwert je Landzelle: 72% Rauschen + 28% Küstenabstand -> Küsten
+  // flach, im Inneren Hügelketten und vereinzelte Gebirgsmassive.
+  const elev = new Float32Array(n);
+  const sorted = [];
+  for (let c = 0; c < n; c++) {
+    if (terrain[c] !== 1) continue;
+    const x = c % w, y = (c / w) | 0;
+    const e = fractal(x * 0.8, y * 0.8, seed + 7919) * 0.72 + Math.min(dist[c], 10) / 10 * 0.28;
+    elev[c] = e;
+    sorted.push(e);
+  }
+  // Schwellen adaptiv als Quantile der Karten-Höhenverteilung: so hat JEDE
+  // Karte (auch Seeds mit flachem Rauschen) verlässlich ~55% Grünfläche,
+  // ~30% Hügel und ~15% Gebirge. Deterministisch, da aus der Karte selbst.
+  sorted.sort((a, b) => a - b);
+  const qGreen = sorted.length ? sorted[(sorted.length * 0.55) | 0] : 1;
+  const qHills = sorted.length ? sorted[(sorted.length * 0.85) | 0] : 1;
+  for (let c = 0; c < n; c++) {
+    if (terrain[c] !== 1) continue;
+    landType[c] = elev[c] < qGreen ? 0 : elev[c] < qHills ? 1 : 2;
+  }
+  return landType;
+}
+
 // Einstiegspunkt: erzeugt die komplette Karte fuer den gewaehlten Typ.
-// Rueckgabe enthaelt Breite/Hoehe, Land/Wasser-Raster (terrain), Anzahl
+// Rueckgabe enthaelt Breite/Hoehe, Land/Wasser-Raster (terrain), das
+// Gelaende-Raster (landType: 0 Grünfläche, 1 Hügel, 2 Gebirge), Anzahl
 // Landzellen sowie die Insel-Zuordnung pro Zelle und die Inselgroessen.
 export function generateMap(seed, w, h, type = 'random') {
   const view = MAP_VIEWS[type];
@@ -219,5 +275,6 @@ export function generateMap(seed, w, h, type = 'random') {
   // Archipel fliegen kleine Splitter-Inseln raus - groessere Landmassen.
   const minIsland = view ? 12 : 400;
   const { island, islandSizes, landCount } = labelIslands(terrain, w, h, minIsland);
-  return { w, h, terrain, landCount, island, islandSizes };
+  const landType = computeLandTypes(terrain, w, h, seed);
+  return { w, h, terrain, landCount, island, islandSizes, landType };
 }
