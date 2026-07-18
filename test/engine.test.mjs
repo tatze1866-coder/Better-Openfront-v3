@@ -1148,6 +1148,38 @@ ok('15-Bot-Spiel auf großer Weltkarte läuft (800 Ticks)',
   ok('Feuerpfeil verschont eigenes Land', gt.owner[myCell] === ownBefore);
 }
 
+// ---- Spiel 18: Turm – Besitzprüfung & Feuerpfeil-Eliminierung ----
+{
+  const gz = newGame(11);
+  while (gz.phase === 'spawn') gz.turn([]);
+  const myCell = gz.landCells.find(c => gz.owner[c] === 0);
+  // Turm direkt platzieren (ohne built-Zeitstempel = sofort nutzbar)
+  const tw = { owner: 0, kind: 'tower', cell: myCell, cd: 0 };
+  gz.buildings.push(tw); gz.buildingAt.set(myCell, tw);
+  gz.players[0].towers = 1;
+  gz.players[0].money = 1000;
+
+  // Fremder Spieler darf den Turm nicht abfeuern (weder Cooldown noch Geld
+  // dürfen sich ändern)
+  gz.players[1].money = 500;
+  gz.applyIntent({ p: 1, type: 'tower_shoot', cell: myCell, ammo: 'stone', target: myCell });
+  ok('Fremder Turm nicht abfeuerbar', tw.cd === 0 && gz.players[1].money === 500);
+
+  // Feuerpfeil, der das letzte Gebiet eines Spielers verbrennt, eliminiert
+  // ihn – wie bei Land-/Bootsangriffen (vorher blieb ein "Geister"-Spieler
+  // ohne Gebiet am Leben und blockierte die Siegbedingung).
+  gz.clearPlayerCells(1);
+  const lone = gz.landCells.find(c => gz.owner[c] === -1 && gz.dist2(c, myCell) > 200);
+  ok('Freie Zelle für den Brand-Test gefunden', lone !== undefined);
+  gz.setOwner(lone, 1);
+  ok('Gegner hält nur noch eine Zelle', gz.players[1].territory === 1 && gz.players[1].alive);
+  gz.applyIntent({ p: 0, type: 'tower_shoot', cell: myCell, ammo: 'fire', target: lone });
+  ok('Feuerpfeil verbrennt die letzte Zelle', gz.owner[lone] === -1);
+  ok('Feuerpfeil eliminiert den Spieler ohne Restgebiet', gz.players[1].alive === false);
+  ok('Eliminierung landet im Ereignis-Feed',
+    gz.feedEvents.some(e => e.t === 'elim' && e.p === 1 && e.by === 0));
+}
+
 console.log(results.join('\n'));
 const fails = results.filter(r => r.startsWith('FAIL')).length;
 console.log(`\n${results.length - fails}/${results.length} Tests bestanden`);

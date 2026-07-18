@@ -266,17 +266,17 @@
         <button id="btnFactory"><img class="build-icon" src="images/buildings/factory.png" alt=""> Fabrik</button>
         <button id="btnTower">🗼 Turm</button>
       </div>
-      <div class="hint">Klick = Angriff · andere Insel = Boot · Rechtsklick = Menü (Bauen, Kriegsschiff, Allianz)</div>
+      <div class="hint" data-i18n="controlHint">Klick = Angriff · andere Insel = Boot · Rechtsklick = Menü (Bauen, Kriegsschiff, Allianz)</div>
       <!-- Turm-Kontrollfeld: sobald man einen fertigen eigenen Turm besitzt,
            schwebt dieses Feld dauerhaft über allem anderen, direkt über der
            Build-Leiste (unten mittig), und zeigt die Munitionspreise. Turm
            auf der Karte anklicken zum Anlegen, dann Ziel anklicken zum
            Feuern (Reichweite ist global). -->
       <div id="towerPanel" class="hidden">
-        <div id="towerPanelLabel">🗼 Turm: Munition wählen</div>
-        <button id="btnAmmoStone" class="ammo-btn">🪨 Stein <span class="ammo-price">15€</span></button>
-        <button id="btnAmmoArrow" class="ammo-btn">🏹 Pfeil <span class="ammo-price">40€</span></button>
-        <button id="btnAmmoFire" class="ammo-btn">🔥 Feuerpfeil <span class="ammo-price">90€</span></button>
+        <div id="towerPanelLabel" data-i18n="towerPanelChooseAmmo">🗼 Turm: Munition wählen</div>
+        <button id="btnAmmoStone" class="ammo-btn">🪨 <span data-i18n="ammoStone">Stein</span> <span class="ammo-price">15€</span></button>
+        <button id="btnAmmoArrow" class="ammo-btn">🏹 <span data-i18n="ammoArrow">Pfeil</span> <span class="ammo-price">40€</span></button>
+        <button id="btnAmmoFire" class="ammo-btn">🔥 <span data-i18n="ammoFire">Feuerpfeil</span> <span class="ammo-price">90€</span></button>
         <button id="btnAmmoCancel">✕</button>
       </div>
     </div>
@@ -288,14 +288,15 @@
     <div id="ctxMenu" class="hidden"></div>
     <div id="shortcutHelp">
       <div class="sh-title">⌨ Steuerung <span id="shToggle">ausblenden</span></div>
+      <!-- data-i18n-html: die Einträge enthalten <b>-Tags, siehe i18n.js -->
       <ul id="shList">
-        <li><b>WASD</b> / Pfeile – Kamera bewegen</li>
-        <li><b>Mausrad</b> – Zoom · <b>Minimap</b> – springen</li>
-        <li><b>1</b> Stadt · <b>2</b> Festung · <b>3</b> Hafen · <b>4</b> Fabrik · <b>5</b> Turm</li>
-        <li><b>Linksklick</b> – angreifen / ausbreiten</li>
-        <li><b>Rechtsklick</b> – Menü (Allianz, Boot, Bauen)</li>
-        <li>Turm anklicken – Munition wählen, Ziel anklicken</li>
-        <li><b>Esc</b> – Modus / Menü abbrechen</li>
+        <li data-i18n="shPan" data-i18n-html><b>WASD</b> / Pfeile – Kamera bewegen</li>
+        <li data-i18n="shZoom" data-i18n-html><b>Mausrad</b> – Zoom · <b>Minimap</b> – springen</li>
+        <li data-i18n="shBuildKeys" data-i18n-html><b>1</b> Stadt · <b>2</b> Festung · <b>3</b> Hafen · <b>4</b> Fabrik · <b>5</b> Turm</li>
+        <li data-i18n="shLeftClick" data-i18n-html><b>Linksklick</b> – angreifen / ausbreiten</li>
+        <li data-i18n="shRightClick" data-i18n-html><b>Rechtsklick</b> – Menü (Allianz, Boot, Bauen)</li>
+        <li data-i18n="shTowerAim">Turm anklicken – Munition wählen, Ziel anklicken</li>
+        <li data-i18n="shEscape" data-i18n-html><b>Esc</b> – Modus / Menü abbrechen</li>
       </ul>
     </div>
     <div id="overlay" class="hidden">

@@ -120,7 +120,7 @@ const TRAIN_PAY = { own: 12, foreign: 24, ally: 36 };
 
 // Katapulte (Belagerungs-Einheit aus der Fabrik, fährt zu Land)
 export const CATAPULT_COST = 500;
-const CATAPULT_CAP_PER_FACTORY = 2;  // max. aktive Katapulte je Fabrik
+export const CATAPULT_CAP_PER_FACTORY = 2; // max. aktive Katapulte je Fabrik (nutzt auch main.js)
 const CATAPULT_SPEED = 1;            // Landzellen pro Tick
 export const CATAPULT_RANGE = 8;     // Schussweite gegen Festungen
 const CATAPULT_RANGE2 = CATAPULT_RANGE * CATAPULT_RANGE;
@@ -792,6 +792,7 @@ export class Game {
     const R = cfg.radius, r2 = R * R;
     let victim = -1;
     const troopHitOwners = new Set(); // je Schuss max. 1x Truppenschaden pro Gegner
+    const burnedOwners = new Set();   // von 'fire' getroffene Besitzer (Eliminierungs-Prüfung unten)
     for (let y = Math.max(0, ty - R); y <= Math.min(h - 1, ty + R); y++) {
       for (let x = Math.max(0, tx - R); x <= Math.min(w - 1, tx + R); x++) {
         const dx = x - tx, dy = y - ty;
@@ -802,9 +803,9 @@ export class Game {
           const o = this.owner[c];
           if (o < 0 || o === p.idx || this.isAllied(o, p.idx)) continue;
           if (victim < 0) victim = o;
-          this.setOwner(c, -1);
+          burnedOwners.add(o);
+          this.setOwner(c, -1); // markiert die Zelle auch als dirty
           if (!this.ruins.some(r => r.cell === c)) this.ruins.push({ cell: c });
-          this.dirty.push(c);
         } else {
           // Truppenschaden: einmalig pro getroffenem Gegner, auch wenn dort
           // kein Gebaeude steht – vorher passierte auf leerem Gegnerland
@@ -834,6 +835,13 @@ export class Game {
           this.dirty.push(c);
         }
       }
+    }
+    // Verbrennt der Feuerpfeil das letzte Gebiet eines Spielers, scheidet er
+    // aus – wie bei Land-/Bootsangriffen (sonst bliebe ein "Geister"-Spieler
+    // ohne Gebiet am Leben und die Siegbedingung könnte nie greifen).
+    for (const o of burnedOwners) {
+      const q = this.players[o];
+      if (q.alive && q.territory === 0) this.eliminate(q, p.idx);
     }
     if (victim >= 0) this.feedEvents.push({ t: 'towerShot', p: victim, by: p.idx, ammo });
   }

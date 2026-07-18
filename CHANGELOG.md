@@ -3,9 +3,28 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
-## [Unreleased]
+## [0.18.0] – 2026-07-18
 
 ### Behoben
+- **Feuerpfeil eliminiert jetzt Spieler, deren letztes Gebiet verbrennt** –
+  vorher blieb ein „Geister“-Spieler ohne einzige Zelle formal am Leben und
+  konnte so sogar die Siegbedingung dauerhaft blockieren. Jetzt scheidet er
+  aus wie bei Land- und Bootsangriffen (inkl. Meldung im Ereignis-Feed).
+- Klick zum Feuern während der Nachladezeit zeigt jetzt die Restzeit an,
+  statt fälschlich „Turm feuert!“ zu melden, obwohl die Engine den Schuss
+  stumm verwirft.
+- Wird der ausgewählte Turm zerstört oder erobert, hebt sich die Auswahl
+  jetzt automatisch auf – vorher blieb das Panel „angelegt“ und Klicks
+  verpufften kommentarlos.
+- Kriegsschiff-/Katapult-Bau im Rechtsklick-Menü ist während der Aufbauzeit
+  von Hafen bzw. Fabrik jetzt ausgegraut („Noch im Aufbau.“) statt einen
+  Erfolgs-Toast zu zeigen, obwohl die Engine den Bau ablehnt.
+
+### Geändert (Übersetzung/UI)
+- Alle Turm-, Katapult- und Kriegsschiff-Hinweise (Toasts, Turm-Panel,
+  Munitionsnamen, Ereignis-Feed, Rechtsklick-Menü) laufen jetzt über die
+  Übersetzung (Deutsch/Englisch) statt hartkodiert deutsch zu sein; die
+  Steuerungs-Legende wird mitübersetzt und nennt jetzt auch Taste 5 (Turm).
 - **Turm griff Gegner faktisch nicht an**: Stein/Pfeil beschädigten bisher
   ausschließlich Gebäude im Aufschlagsradius – auf leerem Gegnerland (der
   Regelfall abseits von Städten/Festungen) passierte sichtbar gar nichts.

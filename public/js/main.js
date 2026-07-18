@@ -1,7 +1,7 @@
 // Client: Menü, Lobby, Netzwerk und Spielschleife.
 // Offline: lokale Turn-Schleife. Online: Server sendet alle 100ms die
 // gesammelten Intents – beide Wege füttern dieselbe Engine.
-import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK, TOWER_AMMO } from './engine.js';
+import { Game, TURN_MS, SPAWN_TURNS, BUILD_COSTS, WARSHIP_COST, CATAPULT_COST, CATAPULT_CAP_PER_FACTORY, MAX_BOATS, BOT_LEVELS, WEAK_BOT_LEVEL, NATION_NAMES, PLAYER_COLORS, MAP_SIZES, MAP_TYPES, GROWTH_PEAK, TOWER_AMMO } from './engine.js';
 import { Renderer } from './renderer.js';
 import { getLang, setLang, applyStaticTranslations, onLangChange, t } from './i18n.js';
 import * as Achievements from './achievements.js';
@@ -923,13 +923,14 @@ function showToast(msg) {
 
 // ---------- Bauen ----------
 const BUILD_KINDS = [
-  { kind: 'city', btn: 'btnCity', label: 'Stadt', key: '1' },
-  { kind: 'fort', btn: 'btnFort', label: 'Festung', key: '2' },
-  { kind: 'port', btn: 'btnPort', label: 'Hafen', key: '3' },
-  { kind: 'factory', btn: 'btnFactory', label: 'Fabrik', key: '4' },
-  { kind: 'tower', btn: 'btnTower', label: 'Turm', key: '5' },
+  { kind: 'city', btn: 'btnCity', key: '1' },
+  { kind: 'fort', btn: 'btnFort', key: '2' },
+  { kind: 'port', btn: 'btnPort', key: '3' },
+  { kind: 'factory', btn: 'btnFactory', key: '4' },
+  { kind: 'tower', btn: 'btnTower', key: '5' },
 ];
-const KIND_NAMES = { city: 'Stadt', fort: 'Festung', port: 'Hafen', factory: 'Fabrik', tower: 'Turm' };
+// Gebäudename in der aktuellen Sprache (i18n-Schlüssel kindCity, kindFort, …)
+const kindName = kind => t('kind' + kind[0].toUpperCase() + kind.slice(1));
 const KIND_EMOJI = { city: '🏙', fort: '🛡', port: '⚓', factory: '🏭', tower: '🗼' };
 
 // Bildpfad je nach gewähltem Gebäude-Grafikstil: 'v1' = altes Wappen-Set,
@@ -960,9 +961,9 @@ function updateBuildButtons() {
 function buildBtnHtml(bk, cost) {
   // Für den Turm existiert kein Wappen-/Insel-Grafiksatz (v1/v2) – immer Emoji.
   if (settings.buildingStyle === 'orig' || bk.kind === 'tower') {
-    return `${KIND_EMOJI[bk.kind]} ${bk.label} (${cost}€)`;
+    return `${KIND_EMOJI[bk.kind]} ${kindName(bk.kind)} (${cost}€)`;
   }
-  return `<img class="build-icon" src="${iconPath(bk.kind)}" alt="">${bk.label} (${cost}€)`;
+  return `<img class="build-icon" src="${iconPath(bk.kind)}" alt="">${kindName(bk.kind)} (${cost}€)`;
 }
 for (const bk of BUILD_KINDS) {
   $(bk.btn).innerHTML = buildBtnHtml(bk, BUILD_COSTS[bk.kind]);
@@ -1013,7 +1014,7 @@ window.addEventListener('keydown', e => {
   const bk = BUILD_KINDS.find(x => x.key === k);
   if (bk) {
     setBuildMode(bk.kind);
-    showToast(buildMode ? `${KIND_NAMES[bk.kind]}: Zielfeld anklicken.` : 'Baumodus beendet.');
+    showToast(buildMode ? t('buildModeTarget', { kind: kindName(bk.kind) }) : t('buildModeEnded'));
   }
 });
 window.addEventListener('keyup', e => keysDown.delete(e.key.toLowerCase()));
@@ -1158,11 +1159,11 @@ function showFeedEvents() {
         pushFeed(t('feedFortOther', { by: nm(e.by), name: nm(e.p) }), false);
       }
     } else if (e.t === 'towerShot' && e.p === myIdx && e.by !== myIdx) {
-      const what = e.ammo === 'fire' ? 'Feuerpfeile' : (e.ammo === 'arrow' ? 'Pfeile' : 'Steine');
-      pushFeed(`🏹 ${nm(e.by)} beschießt dich mit ${what} aus einem Turm!`, true);
+      const what = e.ammo === 'fire' ? t('ammoFeedFire') : (e.ammo === 'arrow' ? t('ammoFeedArrow') : t('ammoFeedStone'));
+      pushFeed(t('feedTowerShotYou', { name: nm(e.by), ammo: what }), true);
     } else if (e.t === 'towerShot' && e.by === myIdx && e.p !== myIdx) {
       // Rueckmeldung an den Schuetzen selbst: der Schuss hat getroffen
-      pushFeed(`🎯 Turm trifft ${nm(e.p)}!`, false);
+      pushFeed(t('feedTowerHit', { name: nm(e.p) }), false);
     }
   }
 }
@@ -1589,12 +1590,18 @@ function hasReadyTower() {
 // zeigt oben an, ob gerade ein Turm zum Feuern angelegt ("armed") ist.
 function updateTowerPanel() {
   const panel = $('towerPanel');
+  // Zerstörten/eroberten Turm nicht ausgewählt lassen – sonst bleibt das
+  // Panel "angelegt" und Schüsse verpuffen kommentarlos in der Engine.
+  if (selectedTower !== null) {
+    const b = game ? game.buildingAt.get(selectedTower) : null;
+    if (!b || b.kind !== 'tower' || b.owner !== myIdx) selectedTower = null;
+  }
   const ready = hasReadyTower();
   panel.classList.toggle('hidden', !ready);
   panel.classList.toggle('armed', selectedTower !== null);
   $('towerPanelLabel').textContent = selectedTower !== null
-    ? '🗼 Turm angelegt – Ziel anklicken!'
-    : (ready ? '🗼 Turm anklicken zum Zielen' : '🗼 Turm: Munition wählen');
+    ? t('towerPanelAimed')
+    : (ready ? t('towerPanelSelect') : t('towerPanelChooseAmmo'));
   for (const [btn, ammo] of [['btnAmmoStone', 'stone'], ['btnAmmoArrow', 'arrow'], ['btnAmmoFire', 'fire']]) {
     const el = $(btn);
     el.classList.toggle('ammo-active', towerAmmo === ammo);
@@ -1662,7 +1669,7 @@ function finishRectSelect() {
     if (inRect(cp.cell)) cpIds.push(cp.id);
   }
   if (!ids.length && !cpIds.length) {
-    showToast('Keine eigenen Kriegsschiffe oder Katapulte im Rechteck.');
+    showToast(t('rectSelectNone'));
     return;
   }
   setWarshipSelection(ids);
@@ -1672,9 +1679,7 @@ function finishRectSelect() {
   } else if (cpIds.length) {
     showToast(cpIds.length === 1 ? t('catapultSelectedOne') : t('catapultSelectedMany', { n: cpIds.length }));
   } else {
-    showToast(ids.length === 1
-      ? 'Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴'
-      : `${ids.length} Kriegsschiffe ausgewählt – Ziel auf dem Wasser anklicken. ⛴`);
+    showToast(ids.length === 1 ? t('warshipSelectedOne') : t('warshipSelectedMany', { n: ids.length }));
   }
 }
 
@@ -1727,7 +1732,7 @@ canvas.addEventListener('pointerup', e => {
       // einzeln ausgewählte Schiff hebt sie auf.
       const wasOnly = selectedWarships.size === 1 && selectedWarships.has(ws.id);
       setWarshipSelection(wasOnly ? [] : [ws.id]);
-      if (selectedWarships.size) showToast('Kriegsschiff ausgewählt – Ziel auf dem Wasser anklicken. ⛴');
+      if (selectedWarships.size) showToast(t('warshipSelectedOne'));
       return;
     }
     if (selectedWarships.size) {
@@ -1735,8 +1740,8 @@ canvas.addEventListener('pointerup', e => {
         // Ein Intent pro Schiff – jedes rechnet seinen eigenen Seeweg
         for (const id of selectedWarships) sendIntent({ type: 'warship_move', ship: id, cell });
         showToast(selectedWarships.size === 1
-          ? 'Kriegsschiff nimmt Kurs! ⛴'
-          : `${selectedWarships.size} Kriegsschiffe nehmen Kurs! ⛴`);
+          ? t('warshipEnRouteOne')
+          : t('warshipEnRouteMany', { n: selectedWarships.size }));
         clearWarshipSelection();
         return;
       }
@@ -1769,7 +1774,7 @@ canvas.addEventListener('pointerup', e => {
     const tw = ownTowerAt(cell);
     if (tw) {
       selectTower(tw.cell === selectedTower ? null : tw.cell);
-      if (selectedTower !== null) showToast('Turm ausgewählt – Munition wählen, dann Ziel anklicken. 🗼');
+      if (selectedTower !== null) showToast(t('towerSelected'));
       return;
     }
     if (selectedTower !== null) {
@@ -1778,15 +1783,20 @@ canvas.addEventListener('pointerup', e => {
       if (cell >= 0 && game.map.terrain[cell] === 1) {
         const cfg = TOWER_AMMO[towerAmmo];
         const meP = game.players[myIdx];
-        if (!meP || meP.money < cfg.cost) {
-          showToast(`Nicht genug Geld (${cfg.cost} € nötig).`);
+        const twB = game.buildingAt.get(selectedTower);
+        if (twB && twB.cd > 0) {
+          // Engine würde den Schuss stumm verwerfen – Restzeit anzeigen statt
+          // fälschlich "Turm feuert!" zu melden.
+          showToast(t('towerReloading', { secs: Math.ceil(twB.cd * TURN_MS / 1000) }));
+        } else if (!meP || meP.money < cfg.cost) {
+          showToast(t('errNotEnoughMoney', { cost: cfg.cost }));
         } else {
           sendIntent({ type: 'tower_shoot', cell: selectedTower, ammo: towerAmmo, target: cell });
-          showToast('Turm feuert! 🏹');
+          showToast(t('towerFired'));
         }
         return;
       }
-      clearTowerSelection(); // Klick außer Reichweite: Auswahl aufheben, normal weiter
+      clearTowerSelection(); // Klick ins Wasser: Auswahl aufheben, normal weiter
     }
   }
 
@@ -1932,13 +1942,14 @@ function buildCtxItems(owner, cell) {
       const me = game.players[myIdx];
       const capped = game.warships.filter(w => w.owner === myIdx).length >= me.ports * 2;
       const tooPoor = me.money < WARSHIP_COST;
+      const deploying = game.underConstruction(ownPort); // Engine lehnt sonst stumm ab
       items.push({
-        label: `⛴ Kriegsschiff bauen (${WARSHIP_COST}€)`,
-        disabled: capped || tooPoor,
-        hint: capped ? 'Maximal 2 Kriegsschiffe je Hafen.' : tooPoor ? 'Nicht genug Geld.' : '',
+        label: t('buildWarshipLabel', { cost: WARSHIP_COST }),
+        disabled: capped || tooPoor || deploying,
+        hint: deploying ? t('stillUnderConstruction') : capped ? t('maxWarships') : tooPoor ? t('notEnoughMoneyShort') : '',
         action: () => {
           sendIntent({ type: 'warship', cell: ownPort.cell });
-          showToast('Kriegsschiff läuft vom Stapel! ⛴');
+          showToast(t('warshipLaunched'));
         }
       });
     }
@@ -1947,12 +1958,13 @@ function buildCtxItems(owner, cell) {
       b.kind === 'factory' && b.owner === myIdx && game.dist2(b.cell, cell) <= 9);
     if (ownFactory) {
       const me = game.players[myIdx];
-      const capped = game.catapults.filter(x => x.owner === myIdx).length >= me.factories * 2;
+      const capped = game.catapults.filter(x => x.owner === myIdx).length >= me.factories * CATAPULT_CAP_PER_FACTORY;
       const tooPoor = me.money < CATAPULT_COST;
+      const deploying = game.underConstruction(ownFactory); // Engine lehnt sonst stumm ab
       items.push({
         label: t('buildCatapultLabel', { cost: CATAPULT_COST }),
-        disabled: capped || tooPoor,
-        hint: capped ? t('maxCatapults') : tooPoor ? t('notEnoughMoneyShort') : '',
+        disabled: capped || tooPoor || deploying,
+        hint: deploying ? t('stillUnderConstruction') : capped ? t('maxCatapults') : tooPoor ? t('notEnoughMoneyShort') : '',
         action: () => {
           sendIntent({ type: 'catapult', cell: ownFactory.cell });
           showToast(t('catapultLaunched'));
@@ -1963,7 +1975,7 @@ function buildCtxItems(owner, cell) {
       const bCell = game.resolveBuildCell(myIdx, cell, bk.kind);
       const err = game.canBuildAt(myIdx, bCell, bk.kind);
       items.push({
-        label: `${bk.label} bauen (${game.buildCostOf(myIdx, bk.kind)}€)`,
+        label: t('buildKindLabel', { kind: kindName(bk.kind), cost: game.buildCostOf(myIdx, bk.kind) }),
         disabled: !!err, hint: err || '',
         action: () => sendIntent({ type: 'build', kind: bk.kind, cell: bCell })
       });
