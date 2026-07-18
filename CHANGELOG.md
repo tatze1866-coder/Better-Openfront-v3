@@ -3,6 +3,27 @@
 Alle nennenswerten Änderungen am OpenFront Klon.
 Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
+## [0.19.0] – 2026-07-18
+
+### Hinzugefügt
+- **Lebendigere Schlacht**: Wo Gebiete den Besitzer wechseln, steigen jetzt
+  kleine Glühfunken in der Farbe des neuen Besitzers auf (bei verbranntem
+  Land in Aschgrau); neu entstehende Trümmerfelder zerplatzen in einem
+  kurzen Staub-/Schutt-Burst.
+- **Angriffs-Richtungspfeile**: Laufende Angriffe zeigen eine animierte
+  gestrichelte Linie („marschierende Ameisen") vom Zentrum des Angreifers
+  zur Front mit Pfeilspitze am Ziel – auf einen Blick sichtbar, wer wen
+  angreift. Angriffs-Badges pulsieren zusätzlich leicht.
+- **Brandung & Kielwasser**: Entlang der Küsten pulsiert ein feiner
+  Schaum-Saum, und hinter Handelsschiffen, Transportbooten und fahrenden
+  Kriegsschiffen zieht eine verblassende Kielwasser-Spur her.
+- **Dampfzüge & Führungskrone**: Über jedem Zug steigen kleine
+  Dampfwölkchen auf; das flächengrößte Reich trägt eine goldene Krone
+  über seinem Namen auf der Karte.
+- Alle neuen Effekte respektieren die Einstellung „Animationen aus"
+  (statisch bzw. abgeschaltet) und sind rein kosmetisch – die Simulation
+  bleibt unverändert deterministisch.
+
 ## [0.18.0] – 2026-07-18
 
 ### Behoben

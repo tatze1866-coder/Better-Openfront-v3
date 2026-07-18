@@ -82,6 +82,11 @@ export class Renderer {
     this.selectedWarshipIds = new Set(); // per Klick/Rechteck ausgewaehlte eigene Kriegsschiffe
     this.selectedCatapultIds = new Set(); // per Klick/Rechteck ausgewaehlte eigene Katapulte
     this.selectRect = null; // Shift-Auswahlrechteck in Bildschirmkoordinaten ({x0,y0,x1,y1})
+    // Kosmetische Partikel (Eroberungs-Funken, Ruinen-Staub): {x, y, dx, dy,
+    // born, life, size, alpha, color} – Position ergibt sich aus der Lebens-
+    // zeit (t = 0..1), keine Integration noetig. Rein visuell, kein Spielzustand.
+    this.particles = [];
+    this.ruinsKnown = new Set(); // Zellen bekannter Truemmerfelder (Burst nur bei NEUEN Ruinen)
     // Minimap-Canvas (optional; im Solo/Online-Spiel vorhanden)
     this.mini = document.getElementById('minimap');
     this.miniCtx = this.mini ? this.mini.getContext('2d') : null;
@@ -170,6 +175,7 @@ export class Renderer {
     const noise = new Float32Array(n);
     const seed = this.game.seed | 0;
     const sparkles = [];
+    const surf = [];   // Uferzellen (depth 1) fuer den Brandungs-Schaum
     for (let c = 0; c < n; c++) {
       const x = c % w, y = (c / w) | 0;
       const patch = hash2(x >> 2, y >> 2, seed);       // 4x4-Flecken (Gelaende-Toene)
@@ -179,10 +185,18 @@ export class Renderer {
       if (terrain[c] === 0) {
         const g2 = hash2(x, y, seed ^ 0x5f2b);
         if (g2 > 0.986) sparkles.push({ x, y, phase: g2 * 40 });
+        // Brandung: gut die Haelfte der direkten Uferzellen (depth 1) als
+        // pulsierender Schaum-Saum; eigener Hash, damit Schaum & Schimmer
+        // nicht korrelieren.
+        if (depth[c] === 1) {
+          const g3 = hash2(x, y, seed ^ 0x2c1b);
+          if (g3 > 0.42) surf.push({ x, y, phase: g3 * 6.28 });
+        }
       }
     }
     this.noise = noise;
     this.sparkles = sparkles;
+    this.surf = surf;
   }
 
   // Eine Zelle in die Rohpixel (this.img) schreiben (4 Bytes: R,G,B,A).
@@ -278,6 +292,25 @@ export class Renderer {
           this.paintCell(yy * w + xx);
     }
     this.imgDirty = true;
+    // Eroberungs-Funken: eine kleine Stichprobe der umgefaerbten Zellen als
+    // aufsteigende Gluehpartikel (Farbe = neuer Besitzer, Aschton bei
+    // neutral/verbrannt). Gedeckelt, damit grosse Eroberungen nicht flackern.
+    if (this.animations && this.particles.length < 420) {
+      const step = Math.max(1, Math.floor(cells.length / 16));
+      const now = performance.now();
+      for (let i = 0; i < cells.length; i += step) {
+        const c = cells[i];
+        if (this.game.map.terrain[c] !== 1) continue;
+        const o = this.game.owner[c];
+        this.particles.push({
+          x: c % w + 0.5, y: ((c / w) | 0) + 0.5,
+          dx: (Math.random() - 0.5) * 1.4, dy: -(1.6 + Math.random() * 2.2),
+          born: now, life: 550 + Math.random() * 450,
+          size: 0.5 + Math.random() * 0.55, alpha: 0.5,
+          color: o >= 0 ? this.game.players[o].color : '#9a917e',
+        });
+      }
+    }
   }
 
   // Bildschirm-Pixel (Maus) in eine Karten-Zellennummer umrechnen (-1 = daneben).
@@ -382,6 +415,14 @@ export class Renderer {
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
 
+    // Das flaechengroesste lebende Reich bekommt eine kleine goldene Krone
+    // ueber den Namen (sichtbare Fuehrungsmarkierung wie im Menue-Stil).
+    let crownIdx = -1, crownCount = 0;
+    for (const [idx, info] of this.labelCache) {
+      const p = g.players[idx];
+      if (p && p.alive && info.count > crownCount) { crownCount = info.count; crownIdx = idx; }
+    }
+
     for (const [idx, info] of this.labelCache) {
       const p = g.players[idx];
       if (!p || !p.alive) continue;
@@ -394,6 +435,26 @@ export class Renderer {
       const areaScale = Math.sqrt(info.count) * this.scale;
       const fontSize = Math.max(9, Math.min(22, areaScale * 0.28));
       if (fontSize < 9.5) continue; // zu winzig -> weglassen statt Buchstabensalat
+
+      // Krone ueber dem Label des groessten Reichs (Zinnen-Polygon, gold)
+      if (idx === crownIdx && fontSize >= 11) {
+        const cw = fontSize * 0.85, ch = fontSize * 0.5;
+        const ky = py - fontSize * 0.85;
+        ctx.beginPath();
+        ctx.moveTo(px - cw / 2, ky);
+        ctx.lineTo(px - cw / 2, ky - ch * 0.6);
+        ctx.lineTo(px - cw * 0.22, ky - ch * 0.22);
+        ctx.lineTo(px, ky - ch);
+        ctx.lineTo(px + cw * 0.22, ky - ch * 0.22);
+        ctx.lineTo(px + cw / 2, ky - ch * 0.6);
+        ctx.lineTo(px + cw / 2, ky);
+        ctx.closePath();
+        ctx.fillStyle = '#ffd60a';
+        ctx.strokeStyle = 'rgba(8, 14, 24, 0.9)';
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+      }
 
       ctx.font = `700 ${fontSize}px 'Cinzel', serif`;
       // Outline fuer Lesbarkeit auf jeder Territoriumsfarbe
@@ -426,13 +487,15 @@ export class Renderer {
     ctx.setTransform(this.scale, 0, 0, this.scale, this.ox, this.oy);
     ctx.drawImage(this.off, 0, 0);       // die ganze Karte in einem Rutsch
     this.drawShimmer(ctx, now);          // pulsierende Lichtpunkte auf dem Wasser
-    this.drawOverlays(ctx);              // Gebaeude/Schiffe/Zuege darueber
+    this.drawOverlays(ctx, now);         // Gebaeude/Schiffe/Zuege darueber
+    this.drawParticles(ctx, now);        // Eroberungs-Funken & Ruinen-Staub
     ctx.setTransform(1, 0, 0, 1, 0, 0);  // zurueck zu Bildschirmkoordinaten
     // Vignette: dezente Abdunklung der Bildschirmraender ueber der Karte,
     // aber unter Badges/Labels.
     ctx.fillStyle = this.vignette;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    this.drawBadges(ctx);
+    this.drawBadges(ctx, now);
+    this.drawAttackArrows(ctx, now);     // Richtungspfeile laufender Angriffe
 
     this.updateLabels(now);              // Flaechen-Schwerpunkte periodisch neu berechnen
     this.drawLabels(ctx);                // Spielernamen auf groesster Flaeche
@@ -457,10 +520,22 @@ export class Renderer {
   // die Pixelkarte selbst bleibt statisch (kein teures Repaint).
   // Bei ausgeschalteten Animationen: statischer, schwacher Schimmer.
   drawShimmer(ctx, now) {
-    if (!this.sparkles.length) return;
     const vx0 = -this.ox / this.scale - 1, vy0 = -this.oy / this.scale - 1;
     const vx1 = vx0 + this.canvas.width / this.scale + 2;
     const vy1 = vy0 + this.canvas.height / this.scale + 2;
+    // Brandung: Schaum-Saum entlang der Kuesten (vor den Lichtpunkten, da
+    // er groessere Flaechen abdeckt). Sanftes, phasenversetztes Pulsieren.
+    if (this.surf.length) {
+      ctx.fillStyle = '#eaf6ff';
+      for (const sf of this.surf) {
+        if (sf.x < vx0 || sf.x > vx1 || sf.y < vy0 || sf.y > vy1) continue;
+        ctx.globalAlpha = this.animations
+          ? 0.05 + 0.15 * (0.5 + 0.5 * Math.sin(now / 900 + sf.phase))
+          : 0.08;
+        ctx.fillRect(sf.x, sf.y, 1, 1);
+      }
+    }
+    if (!this.sparkles.length) { ctx.globalAlpha = 1; return; }
     ctx.fillStyle = '#dff3ff';
     for (const sp of this.sparkles) {
       if (sp.x < vx0 || sp.x > vx1 || sp.y < vy0 || sp.y > vy1) continue;
@@ -472,23 +547,47 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  // Kosmetische Partikel (Eroberungs-Funken, Ruinen-Staub) in Karten-
+  // koordinaten. Position/Alpha ergeben sich aus der Lebenszeit t = 0..1,
+  // abgelaufene Partikel werden per Swap-Pop entfernt.
+  drawParticles(ctx, now) {
+    const ps = this.particles;
+    if (!ps.length) return;
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i];
+      const t = (now - p.born) / p.life;
+      if (t >= 1) { ps[i] = ps[ps.length - 1]; ps.pop(); continue; }
+      ctx.globalAlpha = (1 - t) * p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x + p.dx * t, p.y + p.dy * t, p.size * (1 - t * 0.55), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // Truppen-Badges für laufende Angriffe und Boote (in Bildschirmkoordinaten)
-  drawBadges(ctx) {
+  drawBadges(ctx, now) {
     const g = this.game;
     const w = g.map.w;
     // Hilfsfunktion: eine kleine beschriftete Pille an Kartenposition
     // (mapX, mapY) zeichnen. Ausserhalb des Sichtfensters wird uebersprungen.
-    const badge = (mapX, mapY, label, color) => {
+    // pulse = true laesst die Pille leicht atmen (laufende Angriffe).
+    const badge = (mapX, mapY, label, color, pulse = false) => {
       const px = mapX * this.scale + this.ox;
       const py = mapY * this.scale + this.oy;
       if (px < -60 || py < -30 || px > this.canvas.width + 60 || py > this.canvas.height + 30) return;
+      ctx.save();
+      if (pulse && this.animations) {
+        const f = 1 + 0.06 * Math.sin(now / 300);
+        ctx.translate(px, py); ctx.scale(f, f); ctx.translate(-px, -py);
+      }
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const tw = ctx.measureText(label).width;
       const bw = tw + 14, bh = 19;
       // Pille mit weichem Schatten, danach Rand in Spielerfarbe
-      ctx.save();
       ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
       ctx.shadowBlur = 5;
       ctx.shadowOffsetY = 1;
@@ -497,7 +596,9 @@ export class Renderer {
       if (ctx.roundRect) ctx.roundRect(px - bw / 2, py - bh / 2, bw, bh, bh / 2);
       else ctx.rect(px - bw / 2, py - bh / 2, bw, bh);
       ctx.fill();
-      ctx.restore();
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -506,6 +607,7 @@ export class Renderer {
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.fillText(label, px, py + 0.5);
+      ctx.restore();
     };
     // Pro Angriff eine Badge am Schwerpunkt der Front (⚔ + Truppenzahl)
     for (const atk of g.attacks) {
@@ -516,13 +618,60 @@ export class Renderer {
         sy += (c / w) | 0;
         if (++n >= 150) break; // Stichprobe reicht für den Schwerpunkt
       }
-      badge(sx / n + 0.5, sy / n + 0.5, '⚔ ' + fmt(atk.pool), g.players[atk.attacker].color);
+      badge(sx / n + 0.5, sy / n + 0.5, '⚔ ' + fmt(atk.pool), g.players[atk.attacker].color, true);
     }
     // Pro Transportboot eine Badge (🚢 + Truppenzahl) an der aktuellen Position
     for (const boat of g.boats) {
       const c = boat.path[Math.min(boat.path.length - 1, boat.pos | 0)];
       badge(c % w + 0.5, ((c / w) | 0) - 2.5, '🚢 ' + fmt(boat.troops), g.players[boat.owner].color);
     }
+  }
+
+  // Richtungspfeile laufender Angriffe (Bildschirmkoordinaten): eine animierte
+  // gestrichelte Linie ("marschierende Ameisen") vom Zentrum des Angreifers
+  // zum Schwerpunkt der Front, mit Pfeilspitze am Ziel. Macht auf einen Blick
+  // sichtbar, wer wen angreift.
+  drawAttackArrows(ctx, now) {
+    const g = this.game;
+    const w = g.map.w;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const atk of g.attacks) {
+      if (!atk.frontier.size) continue;
+      const src = this.labelCache.get(atk.attacker);
+      if (!src) continue; // Angreifer ohne nennenswerte Flaeche -> kein Pfeil
+      let sx = 0, sy = 0, n = 0;
+      for (const c of atk.frontier) {
+        sx += c % w;
+        sy += (c / w) | 0;
+        if (++n >= 150) break;
+      }
+      const x0 = src.x * this.scale + this.ox, y0 = src.y * this.scale + this.oy;
+      const x1 = (sx / n + 0.5) * this.scale + this.ox, y1 = (sy / n + 0.5) * this.scale + this.oy;
+      const dx = x1 - x0, dy = y1 - y0;
+      const len = Math.hypot(dx, dy);
+      if (len < 40) continue; // Front fast am Zentrum -> Linie waere nur ein Punkt
+      const ux = dx / len, uy = dy / len;
+      const ax = x0 + ux * 26, ay = y0 + uy * 26;   // startet neben dem Label
+      const bx = x1 - ux * 14, by = y1 - uy * 14;   // endet vor der Badge
+      const col = g.players[atk.attacker].color;
+      ctx.strokeStyle = hexA(col, 0.5);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 7]);
+      if (this.animations) ctx.lineDashOffset = -(now / 60) % 14;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+      // Pfeilspitze am Ziel
+      ctx.fillStyle = hexA(col, 0.75);
+      const pxn = -uy, pyn = ux;
+      ctx.beginPath();
+      ctx.moveTo(bx + ux * 8, by + uy * 8);
+      ctx.lineTo(bx - ux * 4 + pxn * 4.5, by - uy * 4 + pyn * 4.5);
+      ctx.lineTo(bx - ux * 4 - pxn * 4.5, by - uy * 4 - pyn * 4.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // Minimap mit Sichtfenster-Rahmen: die Karte verkleinert plus ein weisses
@@ -547,10 +696,28 @@ export class Renderer {
 
   // Gebäude, Schienen, Züge und Schiffe (in Kartenkoordinaten, Transform aktiv).
   // cx/cy liefern die Zellmitte (+0.5) einer Zellennummer.
-  drawOverlays(ctx) {
+  drawOverlays(ctx, now) {
     const g = this.game;
     const w = g.map.w;
     const cx = c => c % w + 0.5, cy = c => ((c / w) | 0) + 0.5;
+
+    // Kielwasser-Helfer: ein paar verblassende Schaumtupten hinter einem
+    // Schiff, entgegen seiner Fahrtrichtung (dx, dy = Richtung, beliebig
+    // skaliert). Leichtes Zickzack wirkt organischer als eine starre Linie.
+    const wake = (x, y, dx, dy, n = 3) => {
+      const len = Math.hypot(dx, dy);
+      if (len < 0.01) return;
+      const ux = dx / len, uy = dy / len;
+      const pxn = -uy, pyn = ux;
+      for (let k = 1; k <= n; k++) {
+        const off = (k % 2 ? 0.35 : -0.35) * k * 0.5;
+        ctx.fillStyle = `rgba(235, 246, 255, ${0.2 * (1 - k / (n + 1))})`;
+        ctx.beginPath();
+        ctx.arc(x - ux * k * 1.5 + pxn * off, y - uy * k * 1.5 + pyn * off,
+          0.35 + k * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
 
     // Schienennetz zuerst (unter allem): alle Kanten aus dem Engine-Graph –
     // Fabrik–Station UND Stadt–Stadt (siehe buildRailNetwork). Alles in einem
@@ -634,7 +801,35 @@ export class Renderer {
       }
     }
 
-    // Trümmerfelder zerstörter Festungen: dunkler Schutt-Haufen
+    // Trümmerfelder zerstörter Festungen: dunkler Schutt-Haufen.
+    // NEU aufgetauchte Ruinen loesen zuerst einen kurzen Staub-/Schutt-Burst
+    // aus (ruinsKnown merkt, welche Zellen schon bekannt sind).
+    if (this.animations) {
+      if (this.ruinsKnown.size > g.ruins.length + 30) {
+        // Set gedeiht nicht unbegrenzt: ab und zu auf die aktuellen Ruinen
+        // zuruecksetzen (abgeraeumte Felder fallen so wieder raus).
+        this.ruinsKnown = new Set(g.ruins.map(r => r.cell));
+      }
+      for (const r of g.ruins) {
+        if (this.ruinsKnown.has(r.cell)) continue;
+        this.ruinsKnown.add(r.cell);
+        const bx = cx(r.cell), by = cy(r.cell);
+        const t0 = performance.now();
+        for (let k = 0; k < 14; k++) {
+          const ang = (k / 14) * Math.PI * 2 + Math.random() * 0.4;
+          const dist = 2.2 + Math.random() * 2.4;
+          this.particles.push({
+            x: bx, y: by,
+            dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist - 1.2,
+            born: t0, life: 650 + Math.random() * 500,
+            size: 0.6 + Math.random() * 0.7, alpha: 0.65,
+            color: k % 3 === 0 ? '#c9b48a' : k % 3 === 1 ? '#8a7a5a' : '#5c564c',
+          });
+        }
+      }
+    } else if (this.ruinsKnown.size !== g.ruins.length) {
+      this.ruinsKnown = new Set(g.ruins.map(r => r.cell));
+    }
     for (const r of g.ruins) {
       const x = cx(r.cell), y = cy(r.cell);
       ctx.fillStyle = '#3a3630';
@@ -778,7 +973,9 @@ export class Renderer {
     // Züge auf den Schienen: im Standard-Stil das urspruengliche einfache
     // Rechteck, sonst die Dampflok-Sprite (gedreht in Fahrtrichtung, mit
     // Wimpel in Spielerfarbe an der Kabine). Auch hier gilt der gewaehlte
-    // Skin nur fuer die eigenen Zuege.
+    // Skin nur fuer die eigenen Zuege. Ueber jedem Zug steigen kleine
+    // Dampfwoelkchen auf (Phase aus dem Zug-Index, damit sie versetzt puffen).
+    let ti = 0;
     for (const tr of g.trains) {
       const [tx, ty] = g.trainPos(tr);
       const trainStyle = (tr.owner === this.myIdx) ? this.buildingStyle : 'orig';
@@ -787,39 +984,59 @@ export class Renderer {
         ctx.fillRect(tx - 1.4, ty - 0.9, 2.8, 1.8);
         ctx.fillStyle = g.players[tr.owner].color;
         ctx.fillRect(tx - 0.8, ty - 0.4, 1.6, 0.8);
-        continue;
-      }
-      const fx = tr.from % w, fy = (tr.from / w) | 0;
-      const gx = tr.to % w, gy = (tr.to / w) | 0;
-      const angle = Math.atan2(gy - fy, gx - fx);
-      ctx.save();
-      ctx.translate(tx, ty);
-      // Bild-Front zeigt nach links (Winkel PI) -> auf Fahrtrichtung drehen.
-      ctx.rotate(angle - Math.PI);
-      if (TRAIN_IMG.complete && TRAIN_IMG.naturalWidth > 0) {
-        const iw = TRAIN_IMG.naturalWidth, ih = TRAIN_IMG.naturalHeight;
-        const drawW = 6.2, drawH = drawW * (ih / iw);
-        const scale = drawW / iw;
-        // Bildmitte (Lok-Koerpermitte, nicht Bild-Mitte) auf den Ursprung legen
-        const originX = iw * 0.40, originY = ih * 0.52;
-        ctx.drawImage(TRAIN_IMG, -originX * scale, -originY * scale, iw * scale, ih * scale);
-        // Wimpel an der Kabine in Spielerfarbe (Kabine liegt bei ~72% der Bildbreite)
-        ctx.fillStyle = g.players[tr.owner].color;
-        ctx.fillRect((iw * 0.70 - originX) * scale, (ih * 0.18 - originY) * scale, drawW * 0.14, drawH * 0.16);
       } else {
-        // Fallback, solange das Sprite noch laedt
-        ctx.fillStyle = '#2b2016';
-        ctx.fillRect(-1.4, -0.9, 2.8, 1.8);
-        ctx.fillStyle = g.players[tr.owner].color;
-        ctx.fillRect(-0.8, -0.4, 1.6, 0.8);
+        const fx = tr.from % w, fy = (tr.from / w) | 0;
+        const gx = tr.to % w, gy = (tr.to / w) | 0;
+        const angle = Math.atan2(gy - fy, gx - fx);
+        ctx.save();
+        ctx.translate(tx, ty);
+        // Bild-Front zeigt nach links (Winkel PI) -> auf Fahrtrichtung drehen.
+        ctx.rotate(angle - Math.PI);
+        if (TRAIN_IMG.complete && TRAIN_IMG.naturalWidth > 0) {
+          const iw = TRAIN_IMG.naturalWidth, ih = TRAIN_IMG.naturalHeight;
+          const drawW = 6.2, drawH = drawW * (ih / iw);
+          const scale = drawW / iw;
+          // Bildmitte (Lok-Koerpermitte, nicht Bild-Mitte) auf den Ursprung legen
+          const originX = iw * 0.40, originY = ih * 0.52;
+          ctx.drawImage(TRAIN_IMG, -originX * scale, -originY * scale, iw * scale, ih * scale);
+          // Wimpel an der Kabine in Spielerfarbe (Kabine liegt bei ~72% der Bildbreite)
+          ctx.fillStyle = g.players[tr.owner].color;
+          ctx.fillRect((iw * 0.70 - originX) * scale, (ih * 0.18 - originY) * scale, drawW * 0.14, drawH * 0.16);
+        } else {
+          // Fallback, solange das Sprite noch laedt
+          ctx.fillStyle = '#2b2016';
+          ctx.fillRect(-1.4, -0.9, 2.8, 1.8);
+          ctx.fillStyle = g.players[tr.owner].color;
+          ctx.fillRect(-0.8, -0.4, 1.6, 0.8);
+        }
+        ctx.restore();
       }
-      ctx.restore();
+      // Dampfwoelkchen ueber der Lok (kosmetisch, respektiert "Animationen aus")
+      if (this.animations) {
+        const base = (now / 1200 + ti * 0.53) % 1;
+        for (let k = 0; k < 2; k++) {
+          const t = (base + k * 0.5) % 1;
+          ctx.globalAlpha = (1 - t) * 0.28;
+          ctx.fillStyle = '#e8e4da';
+          ctx.beginPath();
+          ctx.arc(tx - t * 0.7, ty - 1.6 - t * 2.3, 0.45 + t * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      ti++;
     }
 
     // Handelsschiffe (kleines Segel ueber Rumpf in Spielerfarbe)
     for (const s of g.tradeShips) {
       const c = g.tradeShipCell(s);
       const x = cx(c), y = cy(c);
+      // Kielwasser entgegen der Fahrtrichtung (zentrierte Pfad-Differenz)
+      if (s.path.length > 1) {
+        const i = Math.min(s.path.length - 1, s.pos | 0);
+        const pc = s.path[Math.max(0, i - 1)], nc = s.path[Math.min(s.path.length - 1, i + 1)];
+        wake(x, y, (nc % w) - (pc % w), ((nc / w) | 0) - ((pc / w) | 0));
+      }
       ctx.fillStyle = g.players[s.owner].color;
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(x - 1.3, y + 0.3, 2.6, 1, 0.5);
@@ -838,6 +1055,11 @@ export class Renderer {
     for (const boat of g.boats) {
       const c = boat.path[Math.min(boat.path.length - 1, boat.pos | 0)];
       const x = cx(c), y = cy(c);
+      if (boat.path.length > 1) {
+        const i = Math.min(boat.path.length - 1, boat.pos | 0);
+        const pc = boat.path[Math.max(0, i - 1)], nc = boat.path[Math.min(boat.path.length - 1, i + 1)];
+        wake(x, y, (nc % w) - (pc % w), ((nc / w) | 0) - ((pc / w) | 0));
+      }
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(x - 1.8, y - 1.2, 3.6, 2.4, 1.2);
@@ -853,6 +1075,11 @@ export class Renderer {
     // Kriegsschiffe (größer, mit Lebensbalken)
     for (const ws of g.warships) {
       const x = cx(ws.cell), y = cy(ws.cell);
+      // Kielwasser nur, solange das Schiff unterwegs ist (Pfad nicht abgefahren)
+      if (ws.pi < ws.path.length) {
+        const pc = ws.path[Math.max(0, ws.pi - 1)], nc = ws.path[ws.pi];
+        wake(x, y, (nc % w) - (pc % w), ((nc / w) | 0) - ((pc / w) | 0));
+      }
       // Ausgewaehlte eigene Schiffe: goldener Ring + Linie/Marke zum Wegpunkt
       if (this.selectedWarshipIds.has(ws.id) && ws.owner === this.myIdx) {
         if (ws.order >= 0) {
